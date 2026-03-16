@@ -1,13 +1,14 @@
 name: workflow-tmas-scan
 
 on:
-    push:
-        branches:
-            - main
-
+  push:
+      branches:
+          - main
+          
 jobs:
     TMAS-SCAN:
         runs-on: self-hosted
+
 
         steps:
             - name: CheckOut
@@ -19,6 +20,9 @@ jobs:
                 username: ${{ secrets.DOCKERHUB_USERNAME }}
                 password: ${{ secrets.DOCKER_PASSWORD }}
 
+            - name: Clean Docker
+              run: docker system prune -af
+
             - name: Build Docker Images
               run: |
                docker compose -f PLOCLO_cms-main/docker-compose.yml build --no-cache
@@ -28,9 +32,9 @@ jobs:
                docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
                docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
 
-           - name: Scan Backend Image
-            uses: trendmicro/tmas-scan-action@v3.1.0
-            with:
+            - name: Scan Backend Image
+              uses: trendmicro/tmas-scan-action@v3.1.0
+              with:
                  version: 'latest'
                  vulnerabilitiesScan: true
                  malwareScan: false
