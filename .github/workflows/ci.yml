@@ -17,25 +17,65 @@ jobs:
               run: |
                docker compose -f PLOCLO_cms-main/docker-compose.yml build
 
-            - name: Show docker Images
-              run: docker images
+            - name: Login To Docker
+              uses: docker/login-action@v3
+              with:
+                username: ${{ secrets.DOCKERHUB_USERNAME }}
+                password: ${{ secrets.DOCKER_PASSWORD }}
 
-            - name: Download TMAS
+            - name: Push Docker Image
               run: |
-               curl -L -o tmas.tar.gz https://ast-cli.xdr.trendmicro.com/tmas-cli/latest/tmas-cli_Linux_x86_64.tar.gz
-               tar -xzf tmas.tar.gz
-               chmod +x ./tmas
+               docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+               docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
 
-            - name: Verify TMAS
+            - name: Scan Image with TMAS
+              uses: trendmicro/tmas-scan-action@v3.1.0
+              with:
+               version: 'latest'
+               vulnerabilitiesScan: true
+               malwareScan: false
+               artifact: |
+                   registry:${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+                   registry:${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+               additionalArgs: --region=ap-southeast-1
+               tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
+               githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Deploy Backend Container
               run: |
-               ./tmas --version
+               docker stop backend || true
+               docker rm backend || true
+               docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+               docker run -d --name backend -p 9771:3001 ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+          
+            - name: Deploy Frontend Container
+              run: |
+               docker stop frontend || true
+               docker rm frontend || true
+               docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+               docker run -d --name frontend-p 9770:3000 ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+
+
+
+
+
+
+            # - name: Download TMAS
+            #   run: |
+            #    curl -L -o tmas.tar.gz https://ast-cli.xdr.trendmicro.com/tmas-cli/latest/tmas-cli_Linux_x86_64.tar.gz
+            #    tar -xzf tmas.tar.gz
+            #    chmod +x ./tmas
+
+            # - name: Verify TMAS
+            #   run: |
+            #    ./tmas --version
             
-            - name: Scan Backend Image
-              run: |
-               ./tmas scan image ploclo_cms-main_backend \
-               --token ${{ secrets.VISION_ONE_API_KEY }}
+            # - name: Scan Backend Image
+            #   run: |
+            #    ./tmas scan image ploclo_cms-main-backend:latest \
+            #    --token {{ secrets.VISION_ONE_API_KEY }}
 
-            - name: Scan frontend Image
-              run: |
-               ./tmas scan image ploclo_cms-main_frontend \
-               --token ${{ secrets.VISION_ONE_API_KEY }}
+            # - name: Scan frontend Image
+            #   run: |
+            #    ./tmas scan image ploclo_cms-main-frontend:latest \
+            #    --token {{ secrets.VISION_ONE_API_KEY }}
