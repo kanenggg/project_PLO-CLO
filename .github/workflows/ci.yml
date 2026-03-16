@@ -1,4 +1,4 @@
-name : workflow tmas-scan
+name: workflow tmas-scan
 
 on:
     push:
@@ -11,15 +11,20 @@ jobs:
 
         steps:
             - name: CheckOut
-              uses: actions/checkout@4
+              uses: actions/checkout@v4
 
             - name: Download TMAS
               run: |
-               curl -L -o tmas https://artifact-scanner-url
-               chmod +x tmas
+               curl -L -o tmas.tar.gz https://ast-cli.xdr.trendmicro.com/tmas-cli/latest/tmas-cli_Linux_x86_64.tar.gz
+               tar -xzf tmas.tar.gz
+               chmod +x ./tmas
+
+            - name: Verify TMAS
+              run: |
+               ./tmas --version
             
             - name: Run Artifact Scan
               run: |
-               /.tmas scan \
+               ./tmas scan \
                --artifact ./ \
                --token ${{ secrets.VISION_ONE_API_KEY }}
