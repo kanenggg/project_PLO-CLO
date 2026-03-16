@@ -1,4 +1,4 @@
-name: workflow tmas-scan
+name: workflow-tmas-scan
 
 on:
     push:
@@ -13,6 +13,13 @@ jobs:
             - name: CheckOut
               uses: actions/checkout@v4
 
+            - name: Build Docker Images
+              run: |
+               docker compose build
+
+            - name: Show docker Images
+              run: docker images
+
             - name: Download TMAS
               run: |
                curl -L -o tmas.tar.gz https://ast-cli.xdr.trendmicro.com/tmas-cli/latest/tmas-cli_Linux_x86_64.tar.gz
@@ -23,8 +30,14 @@ jobs:
               run: |
                ./tmas --version
             
-            - name: Run Artifact Scan
+            - name: Scan Backend Image
               run: |
                ./tmas scan \
-               --artifact ./ \
+               --artifact ploclo_cms-main_backend \
+               --token ${{ secrets.VISION_ONE_API_KEY }}
+
+            - name: Scan frontend Image
+              run: |
+               ./tmas scan \
+               --artifact ploclo_cms-main_frontend \
                --token ${{ secrets.VISION_ONE_API_KEY }}
