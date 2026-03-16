@@ -1,0 +1,25 @@
+name : workflow tmas-scan
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    build:
+        runs-on: self-hosted
+
+        steps:
+            - name: CheckOut
+              uses: actions/checkout@4
+
+            - name: Download TMAS
+              run: |
+               curl -L -o tmas https://artifact-scanner-url
+               chmod +x tmas
+            
+            - name: Run Artifact Scan
+              run: |
+               /.tmas scan \
+               --artifact ./ \
+               --token ${{ secrets.VISION_ONE_API_KEY }}
