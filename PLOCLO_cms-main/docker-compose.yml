@@ -32,6 +32,7 @@ services:
       context: ./backend
       args:
         - DATABASE_URL=${DATABASE_URL}
+    image: kanenggg/ploclo_cms-main-backend:latest
     container_name: backend
     depends_on:
       postgres:
@@ -49,6 +50,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    image: kanenggg/ploclo_cms-main-frontend:latest
     container_name: frontend
     volumes:
       - ./frontend:/app
