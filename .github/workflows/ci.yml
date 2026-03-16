@@ -6,7 +6,7 @@ on:
             - main
 
 jobs:
-    build:
+    TMAS-SCAN:
         runs-on: self-hosted
 
         steps:
@@ -23,11 +23,6 @@ jobs:
               run: |
                docker compose -f PLOCLO_cms-main/docker-compose.yml build --no-cache
 
-            - name: Push Docker Image
-              run: |
-               docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
-               docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
-
             - name: Scan Image with TMAS
               uses: trendmicro/tmas-scan-action@v3.1.0
               with:
@@ -40,6 +35,11 @@ jobs:
                additionalArgs: --region=ap-southeast-1
                tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
                githubToken: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Push Docker Image
+              run: |
+               docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+               docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
 
             - name: Deploy Backend Container
               run: |
