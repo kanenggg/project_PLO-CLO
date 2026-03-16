@@ -32,12 +32,10 @@ jobs:
             
             - name: Scan Backend Image
               run: |
-               ./tmas scan \
-               --artifact ploclo_cms-main_backend \
+               ./tmas scan image ploclo_cms-main_backend \
                --token ${{ secrets.VISION_ONE_API_KEY }}
 
             - name: Scan frontend Image
               run: |
-               ./tmas scan \
-               --artifact ploclo_cms-main_frontend \
+               ./tmas scan image ploclo_cms-main_frontend \
                --token ${{ secrets.VISION_ONE_API_KEY }}
