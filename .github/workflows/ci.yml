@@ -25,7 +25,8 @@ jobs:
 
             - name: Build Docker Images
               run: |
-               docker compose -f PLOCLO_cms-main/docker-compose.yml build --no-cache
+               docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest ./PLOCLO_cms-main/backend
+               docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest ./PLOCLO_cms-main/frontend
 
             - name: Push Docker Image
               run: |
