@@ -80,8 +80,8 @@ jobs:
 
             - name: Appy mainfests & Deploy to minikube
               run: |
-               kubectl apply -f k8s/backend-deployment.yaml
-               kubectl apply -f k8s/frontend-deployment.yaml
+               kubectl apply -f PLOCLO_cms-main/k8s/backend-deployment.yaml
+               kubectl apply -f PLOCLO_cms-main/k8s/frontend-deployment.yaml
 
                kubectl set image deployment/ploclo_cms-main-frontend:latest \
                frontend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
