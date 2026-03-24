@@ -15,7 +15,7 @@ jobs:
                submodules: false
 
             - name: Sonarqube
-              uses: Sonarsource/sonarqube-scan@v2
+              uses: SonarSource/sonarqube-scan-action@v4
               env:
                 SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
                 SONAR_TOKEN: ${{ secrets.SONAR_TOKEN}}
