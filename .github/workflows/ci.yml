@@ -80,6 +80,7 @@ jobs:
 
             - name: Appy mainfests & Deploy to minikube
               run: |
+               working-directory: PLOCLO_cms-main
                kubectl apply -f PLOCLO_cms-main/k8s/backend-deployment.yaml
                kubectl apply -f PLOCLO_cms-main/k8s/frontend-deployment.yaml
 
