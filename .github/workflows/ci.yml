@@ -7,14 +7,18 @@ on:
           
 jobs:
     TMAS-SCAN:
-        runs-on: self-hosted
-
-
+        runs-on: ubuntu-latest
         steps:
             - name: CheckOut
               uses: actions/checkout@v4
               with:
                submodules: false
+
+            - name: Sonarqube
+              uses: Sonarsource/sonarqube-scan@v2
+              env:
+                SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN}}
 
             - name: Login To Docker
               uses: docker/login-action@v3
@@ -57,24 +61,34 @@ jobs:
                tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
                githubToken: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Deploy Backend Container
+
+    deploy:
+       runs-on: self-hosted
+       needs: TMAS-SCAN
+       steps:
+            - name: Check minikube Status
               run: |
-               docker stop backend || true
-               docker rm backend || true
-               docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
-               docker run -d --name backend -p 9771:3001 ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
-          
-            - name: Deploy Frontend Container
+               minikube status
+               kubectl cluster-info
+
+            - name: Pull images
               run: |
-               docker stop frontend || true
-               docker rm frontend || true
                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
-               docker run -d --name frontend -p 9770:3000 ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+               docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
+            - name: Appy mainfests & Deploy to minikube
+              run: |
+               kubectl apply -f k8s/backend-deployment.yaml
+               kubectl apply -f k8s/frontend-deployment.yaml
 
+               kubectl set image deployment/ploclo_cms-main-frontend:latest \
+               frontend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+               kubectl set image deployment/ploclo_cms-main-backend:latest \
+               backend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
-
-
+               kubectl rollout status deployment/ploclo_cms-main-frontend
+               kubectl rollout status deployment/ploclo_cms-main-backend
+          
 
             # - name: Download TMAS
             #   run: |
