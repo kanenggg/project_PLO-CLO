@@ -79,8 +79,8 @@ jobs:
                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
             - name: Appy mainfests & Deploy to minikube
+              working-directory: PLOCLO_cms-main
               run: |
-               working-directory: PLOCLO_cms-main
                kubectl apply -f PLOCLO_cms-main/k8s/backend-deployment.yaml
                kubectl apply -f PLOCLO_cms-main/k8s/frontend-deployment.yaml
 
