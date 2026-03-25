@@ -19,6 +19,8 @@ spec:
         ports:
         - containerPort: 9771
         env:
+        - name: PORT
+          value: "9771"
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
