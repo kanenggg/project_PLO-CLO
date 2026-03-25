@@ -15,11 +15,19 @@ spec:
       containers:
       - name: frontend
         image: kansumware/ploclo_cms-main-frontend:latest
+        imagePullPolicy: Always
         ports:
-        - containerPort: 3000
+        - containerPort: 9770
         env:
         - name: NEXT_PUBLIC_API_URL
-          value: "http://backend-svc:3001"
+          value: "MINIKUBE_IP_PLACEHOLDER"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
 ---
 apiVersion: v1
 kind: Service
@@ -31,5 +39,5 @@ spec:
     app: frontend
   ports:
   - port: 3000
-    targetPort: 3000
+    targetPort: 9770
     nodePort: 30001

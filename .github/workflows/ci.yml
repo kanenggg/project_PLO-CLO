@@ -90,6 +90,11 @@ jobs:
 
             - name: Apply manifests & Deploy to minikube
               run: |
+               MINIKUBE_IP=$(minikube ip)
+
+               sed -i "s|MINIKUBE_IP_PLACEHOLDER|http://${MINIKUBE_IP}:30000|g" \
+               PLOCLO_cms-main/k8s/frontend-deployment.yaml
+
                kubectl apply -f PLOCLO_cms-main/k8s/backend-deployment.yaml
                kubectl apply -f PLOCLO_cms-main/k8s/frontend-deployment.yaml
 

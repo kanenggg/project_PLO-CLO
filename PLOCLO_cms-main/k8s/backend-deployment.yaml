@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment          
+kind: Deployment
 metadata:
   name: backend
 spec:
@@ -15,18 +15,26 @@ spec:
       containers:
       - name: backend
         image: kansumware/ploclo_cms-main-backend:latest
+        imagePullPolicy: Always
         ports:
-        - containerPort: 3001
+        - containerPort: 9771
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: backend-svc       
+  name: backend-svc
 spec:
   type: NodePort
-  selector:               
+  selector:
     app: backend
-  ports:                  
-  - port: 3001
-    targetPort: 3001
+  ports:
+  - port: 9771
+    targetPort: 9771
     nodePort: 30000
