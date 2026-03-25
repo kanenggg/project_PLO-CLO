@@ -68,6 +68,12 @@ jobs:
        runs-on: self-hosted
        needs: TMAS-SCAN
        steps:
+
+            - name: Checkout Code
+              uses: actions/checkout@v4
+              with:
+               submodules: true
+
             - name: Check minikube Status
               run: |
                minikube status
@@ -80,12 +86,12 @@ jobs:
 
             - name: Appy mainfests & Deploy to minikube
               run: |
-               kubectl apply -f ./PLOCLO_cms-main/k8s/backend-deployment.yaml
-               kubectl apply -f ./PLOCLO_cms-main/k8s/frontend-deployment.yaml
+               kubectl apply -f PLOCLO_cms-main/k8s/backend-deployment.yaml
+               kubectl apply -f PLOCLO_cms-main/k8s/frontend-deployment.yaml
 
-               kubectl set image deployment/ploclo_cms-main-frontend:latest \
+               kubectl set image deployment/ploclo_cms-main-frontend \
                frontend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
-               kubectl set image deployment/ploclo_cms-main-backend:latest \
+               kubectl set image deployment/ploclo_cms-main-backend \
                backend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
                kubectl rollout status deployment/ploclo_cms-main-frontend
