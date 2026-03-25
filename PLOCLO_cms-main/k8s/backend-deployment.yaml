@@ -20,7 +20,35 @@ spec:
         - containerPort: 9771
         env:
         - name: DATABASE_URL
-          value: "postgresql://postgres:postgres@postgres:5432/ploclo"
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: DATABASE_URL
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: DB_HOST
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: DB_PORT
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: DB_PASSWORD
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: DB_NAME
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
