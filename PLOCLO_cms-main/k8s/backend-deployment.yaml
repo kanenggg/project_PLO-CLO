@@ -21,6 +21,12 @@ spec:
         env:
         - name: DATABASE_URL
           value: "postgresql://postgres:postgres@postgres:5432/ploclo"
+
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+               name: app-secret
+               key: JWT_SECRET
         resources:
           requests:
             memory: "128Mi"
