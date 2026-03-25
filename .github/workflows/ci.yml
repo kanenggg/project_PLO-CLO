@@ -79,6 +79,10 @@ jobs:
                minikube status
                kubectl cluster-info
 
+            - name: Clean Minikube Disk
+              run: |
+               minikube ssh -- docker system prune -af || true
+
             - name: Pull images
               run: |
                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
