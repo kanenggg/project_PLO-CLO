@@ -18,6 +18,9 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 9771
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://postgres:postgres@postgres:5432/ploclo"
         resources:
           requests:
             memory: "128Mi"

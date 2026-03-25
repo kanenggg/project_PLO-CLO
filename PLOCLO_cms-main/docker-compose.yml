@@ -55,7 +55,6 @@ services:
       - /app/.next
     ports:
       - "9770:3000"
-    environment:
       - NODE_ENV=development
     command: npm run dev
     env_file:
