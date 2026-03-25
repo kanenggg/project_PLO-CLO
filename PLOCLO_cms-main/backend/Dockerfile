@@ -7,6 +7,7 @@ COPY prisma ./prisma
 
 RUN npm install
 
+RUN apk add --no-cache postgresql-client
 # ✅ 1. Accept the argument
 ARG DATABASE_URL
 # ✅ 2. Set it as an environment variable for the next commands
