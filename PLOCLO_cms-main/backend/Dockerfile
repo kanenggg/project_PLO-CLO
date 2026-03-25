@@ -17,6 +17,8 @@ RUN npx prisma generate
 
 COPY . .
 
+RUN sed -i 's/\r$//' wait-for-db.sh && chmod +x wait-for-db.sh
+
 RUN npm run build
 
 EXPOSE 9771
