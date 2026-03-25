@@ -84,18 +84,19 @@ jobs:
                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
                docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
-            - name: Appy mainfests & Deploy to minikube
+            - name: Apply manifests & Deploy to minikube
               run: |
                kubectl apply -f PLOCLO_cms-main/k8s/backend-deployment.yaml
                kubectl apply -f PLOCLO_cms-main/k8s/frontend-deployment.yaml
 
                kubectl set image deployment/frontend \
                frontend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+
                kubectl set image deployment/backend \
                backend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
-               kubectl rollout status deployment/ploclo_cms-main-frontend
-               kubectl rollout status deployment/ploclo_cms-main-backend
+               kubectl rollout status deployment/frontend
+               kubectl rollout status deployment/backend
           
 
             # - name: Download TMAS
