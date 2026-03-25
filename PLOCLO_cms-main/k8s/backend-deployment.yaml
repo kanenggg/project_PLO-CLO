@@ -21,12 +21,26 @@ spec:
         env:
         - name: DATABASE_URL
           value: "postgresql://postgres:postgres@postgres:5432/ploclo"
-
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
-               name: app-secret
-               key: JWT_SECRET
+              name: app-secret
+              key: JWT_SECRET
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: GOOGLE_CLIENT_ID
+        - name: GOOGLE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: GOOGLE_CLIENT_SECRET
+        - name: GOOGLE_CALLBACK_URL
+          valueFrom:
+            secretKeyRef:
+              name: app-secret
+              key: GOOGLE_CALLBACK_URL
         resources:
           requests:
             memory: "128Mi"
