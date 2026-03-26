@@ -47,22 +47,27 @@ jobs:
             postgres:15
 
       - name: Run backend
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CALLBACK_URL: ${{ secrets.GOOGLE_CALLBACK_URL }}
         run: |
+         python3 -c "
+          import os
+          vars = ['JWT_SECRET','DB_PASSWORD','DATABASE_URL','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','GOOGLE_CALLBACK_URL']
+          with open('/tmp/backend.env','w') as f:
+              for v in vars:
+                  f.write(f'{v}={os.environ[v]}\n')
+              f.write('DB_HOST=postgres\nDB_PORT=5432\nDB_USER=postgres\nDB_NAME=myapp\nNODE_ENV=development\n')
+          "
           docker run -d \
             --name backend \
             --network myapp-net \
             -p 9771:3001 \
-            -e DB_HOST=postgres \
-            -e DB_PORT=5432 \
-            -e DB_USER=postgres \
-            -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-            -e DB_NAME=myapp \
-            -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
-            -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
-            -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
-            -e GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
-            -e GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }} \
-            -e NODE_ENV=development \
+            --env-file /tmp/backend.env \
             ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
       - name: Run frontend
