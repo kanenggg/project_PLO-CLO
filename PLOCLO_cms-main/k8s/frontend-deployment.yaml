@@ -39,5 +39,5 @@ spec:
     app: frontend
   ports:
   - port: 3000
-    targetPort: 9770
+    targetPort: 3000
     nodePort: 30001
