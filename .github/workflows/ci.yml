@@ -55,14 +55,14 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_CALLBACK_URL: ${{ secrets.GOOGLE_CALLBACK_URL }}
         run: |
-         python3 -c "
+          python3 << 'EOF'
           import os
           vars = ['JWT_SECRET','DB_PASSWORD','DATABASE_URL','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','GOOGLE_CALLBACK_URL']
           with open('/tmp/backend.env','w') as f:
               for v in vars:
                   f.write(f'{v}={os.environ[v]}\n')
               f.write('DB_HOST=postgres\nDB_PORT=5432\nDB_USER=postgres\nDB_NAME=myapp\nNODE_ENV=development\n')
-          "
+          EOF
           docker run -d \
             --name backend \
             --network myapp-net \
