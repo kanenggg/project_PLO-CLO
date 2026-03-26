@@ -25,12 +25,12 @@ jobs:
 
       - name: Build and Push Backend
         run: |
-         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./PLOCLO/backend
+         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./PLOCLO_cms/backend
          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
 
       - name: Build and Push Frontend
         run: |
-         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO/frontend
+         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO_cms/frontend
          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
 
       - name: Deploy with docker compose
