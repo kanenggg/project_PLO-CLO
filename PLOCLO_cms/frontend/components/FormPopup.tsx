@@ -275,21 +275,25 @@ export default function FormPopup<T>({
               />
             )}
 
+            {/* Semester Dropdown */}
             {semesterOptions.length > 0 && onSemesterChange && (
               <DropdownSelect
                 value={selectedSemester}
                 onChange={onSemesterChange}
                 options={semesterOptions}
-                disabled={!selectedProgram}
+                // 🟢 แก้ไข: ให้เปิดใช้งานได้ทันทีเมื่อเลือกคณะ (ไม่ต้องรอเลือก Program)
+                disabled={!selectedYear}
                 // label="Semester"
               />
             )}
 
+            {/* Section Dropdown */}
             {sectionOptions.length > 0 && onSectionChange && (
               <DropdownSelect
                 value={selectedSection}
                 onChange={onSectionChange}
                 options={sectionOptions}
+                // 🟢 แก้ไข: ให้เปิดใช้งานเมื่อเลือกเทอมแล้ว
                 disabled={!selectedSemester}
                 // label="Section"
               />

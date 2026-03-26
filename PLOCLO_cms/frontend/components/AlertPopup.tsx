@@ -88,7 +88,7 @@ export default function AlertPopup({
             {title || (type === "confirm" ? t("Confirm Action") : t("Notice"))}
           </h2>
 
-          <p className="text-gray-500 font-light text-center mb-8 text-[14px] leading-relaxed">
+          <p className="text-gray-500 font-light text-center mb-8 text-[18px] leading-relaxed">
             {message}
           </p>
 

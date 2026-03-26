@@ -107,12 +107,9 @@ export default function CourseManagement({
 
   useEffect(() => {
     if (!token) return;
-
     const initialize = async () => {
       try {
         setLoadingCourse(true);
-
-        // 1. Fetch และ Format มหาวิทยาลัยครั้งเดียว
         const uniData = await getUniversities(token);
         const formattedUni = uniData.map((u: University) => ({
           label: lang === "th" ? u.name_th : u.name,
@@ -125,38 +122,31 @@ export default function CourseManagement({
         };
 
         if (isInstructor && user?.email) {
-          // 2. Instructor Path
           const instructorRes = await apiClient.get(
             `/instructor/email/${user.email}`,
             {
               headers: { Authorization: `Bearer ${token}` },
             },
           );
-          const facultyId = instructorRes.data?.faculty_id;
-
-          const facultyRes = await apiClient.get(`/faculty/${facultyId}`, {
+          const fId = instructorRes.data?.faculty_id;
+          const facultyRes = await apiClient.get(`/faculty/${fId}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
-          const facultyData = facultyRes.data;
 
           const facultiesData = await getFaculties(
             token,
-            String(facultyData.university_id),
+            String(facultyRes.data.university_id),
           );
           const formattedFacs = facultiesData.map((f: Faculty) => ({
             label: lang === "th" ? f.name_th : f.name,
             value: String(f.id),
           }));
 
-          // ✅ แก้ไข: ใช้ formattedUni ตรงๆ ไม่ต้อง map ซ้ำ
           setUniversityOptions([defaultUniOption, ...formattedUni]);
-          setFacultyOptions([...formattedFacs]);
-
-          setSelectedUniversity(String(facultyData.university_id));
-          setSelectedFaculty(String(facultyId));
+          setFacultyOptions(formattedFacs);
+          setSelectedUniversity(String(facultyRes.data.university_id));
+          setSelectedFaculty(String(fId));
         } else {
-          // 3. Admin Path
-          // ✅ แก้ไข: ใช้ formattedUni ตรงๆ ไม่ต้อง map ซ้ำ
           setUniversityOptions([defaultUniOption, ...formattedUni]);
         }
       } catch (err) {
@@ -166,9 +156,8 @@ export default function CourseManagement({
         setLoadingCourse(false);
       }
     };
-
     initialize();
-  }, [token, user?.email, user?.role, lang, t]); // เพิ่ม t เข้าไปใน dependency ด้วย
+  }, [token, user?.email, user?.role, lang, t]);
 
   useEffect(() => {
     if (!token || !selectedUniversity || isInstructor || !isInitialized) {
@@ -220,63 +209,69 @@ export default function CourseManagement({
       .catch((err) => showToast("API program error: " + err.message, "error"));
   }, [isLoggedIn, token, selectedFaculty, t, lang, showToast]);
 
-  // 4. Fetch Programs (Filtered by Year)
-  useEffect(() => {
-    if (!isLoggedIn || !token || !selectedFaculty || !selectedYear) {
-      setProgramOptions([{ label: t("please select a program"), value: "" }]);
-      setSelectedProgram("");
-      return;
-    }
+  // // 4. Fetch Programs (Filtered by Year)
+  // useEffect(() => {
+  //   if (!isLoggedIn || !token || !selectedFaculty || !selectedYear) {
+  //     setProgramOptions([{ label: t("please select a program"), value: "" }]);
+  //     setSelectedProgram("");
+  //     return;
+  //   }
 
-    getPrograms(token, selectedFaculty)
-      .then((data) => {
-        const programs = data.filter(
-          (p: Program) => String(p.program_year) === selectedYear,
-        );
+  //   getPrograms(token, selectedFaculty)
+  //     .then((data) => {
+  //       const programs = data.filter(
+  //         (p: Program) => String(p.program_year) === selectedYear,
+  //       );
 
-        if (programs.length === 0) {
-          setProgramOptions([{ label: t("no programs available"), value: "" }]);
-        } else {
-          setProgramOptions([
-            { label: t("please select a program"), value: "" },
-            ...programs.map((p: Program) => ({
-              label:
-                lang === "th"
-                  ? `${p.program_code} - ${p.program_shortname_th}`
-                  : `${p.program_code} - ${p.program_shortname_en}`,
-              value: String(p.id),
-            })),
-          ]);
-        }
-      })
-      .catch((err: unknown) => {
-        if (err instanceof Error) {
-          showToast("API program error: " + err.message, "error");
-        }
-      });
-  }, [isLoggedIn, token, selectedFaculty, selectedYear, t, lang, showToast]);
+  //       if (programs.length === 0) {
+  //         setProgramOptions([{ label: t("no programs available"), value: "" }]);
+  //       } else {
+  //         setProgramOptions([
+  //           { label: t("please select a program"), value: "" },
+  //           ...programs.map((p: Program) => ({
+  //             label:
+  //               lang === "th"
+  //                 ? `${p.program_code} - ${p.program_shortname_th}`
+  //                 : `${p.program_code} - ${p.program_shortname_en}`,
+  //             value: String(p.id),
+  //           })),
+  //         ]);
+  //       }
+  //     })
+  //     .catch((err: unknown) => {
+  //       if (err instanceof Error) {
+  //         showToast("API program error: " + err.message, "error");
+  //       }
+  //     });
+  // }, [isLoggedIn, token, selectedFaculty, selectedYear, t, lang, showToast]);
 
   // --- Fetch List Logic ---
   const fetchCourses = useCallback(async () => {
     if (!isLoggedIn || !token) return;
     setLoadingCourse(true);
-
     try {
       const data = await getCoursePaginate(token, page, limit, {
         universityId,
-        facultyId,
-        programId,
+        facultyId: facultyId || selectedFaculty,
+        programCode: programId || selectedProgram,
       });
-      const courseData = data.data || [];
-
-      // Store ALL data (so pagination works correctly)
-      setCourses(courseData);
+      setCourses(data.data || []);
     } catch {
       showToast("Error fetching courses", "error");
     } finally {
       setLoadingCourse(false);
     }
-  }, [isLoggedIn, token, page, universityId, facultyId, programId, showToast]);
+  }, [
+    isLoggedIn,
+    token,
+    page,
+    universityId,
+    facultyId,
+    selectedFaculty,
+    programId,
+    selectedProgram,
+    showToast,
+  ]);
 
   useEffect(() => {
     fetchCourses();
@@ -285,48 +280,37 @@ export default function CourseManagement({
   // --- ADD COURSE Handlers ---
 
   const handleAddCourse = async (data: Record<string, unknown>) => {
-    if (!token) return;
+    if (!token || !selectedProgram || !selectedFaculty) {
+      showToast(t("Please fill all required fields"), "error");
+      return;
+    }
 
-    if (!selectedProgram) {
-      showToast("Please select a Program.", "error");
-      return;
-    }
-    if (!selectedYear) {
-      showToast("Please select an Academic Year.", "error");
-      return;
-    }
-    if (!selectedSemester) {
-      showToast("Please select a Semester.", "error");
-      return;
-    }
-    if (!selectedSection) {
-      showToast("Please select a Section.", "error");
-      return;
-    }
     setLoadingCourse(true);
-
     try {
       await addCourse(
         {
           code: String(data.code),
           name: String(data.nameEn),
           name_th: String(data.nameTh),
-          program_id: String(selectedProgram),
-          year: selectedYear,
-          semester: selectedSemester,
-          section: selectedSection,
+          faculty_id: Number(selectedFaculty), // 🟢 ระบุเจ้าของวิชา
+          // program_id: Number(selectedProgram), // 🟢 ระบุหลักสูตรที่ใช้
+          // year: Number(selectedYear),
+          // semester: Number(selectedSemester),
+          // section: Number(selectedSection),
+          credits: 3,
         },
         token,
       );
+
+      showToast(t("Course section added successfully!"), "success");
       fetchCourses();
-      setPage(1);
-      showToast(t("Course added successfully!"), "success");
-      setSelectedUniversity("");
-      setSelectedSemester("");
-      setSelectedSection("");
     } catch (err: any) {
-      const msg = err.response?.data?.error || t("Failed to add course");
-      showToast(msg, "error");
+      showToast(
+        err.response?.data?.error || t("Failed to add course"),
+        "error",
+      );
+    } finally {
+      setLoadingCourse(false);
     }
   };
 
@@ -336,13 +320,13 @@ export default function CourseManagement({
       return;
     }
 
-    if (!selectedProgram || !selectedYear) {
-      showToast(
-        "Please select Program and Year from the dropdowns first.",
-        "error",
-      );
-      return;
-    }
+    // if (!selectedProgram || !selectedYear) {
+    //   showToast(
+    //     "Please select Program and Year from the dropdowns first.",
+    //     "error",
+    //   );
+    //   return;
+    // }
 
     let successCount = 0;
     let failCount = 0;
@@ -367,7 +351,8 @@ export default function CourseManagement({
         code: String(code),
         name_th: String(nameTh),
         name: String(nameEn),
-        program_id: selectedProgram,
+        // program_id: selectedProgram,
+        faculty_id: selectedFaculty || "1", // Fallback to 1 if not selected
         year: selectedYear,
         semester: selectedSemester || "1",
         section: selectedSection || "1",
@@ -400,34 +385,44 @@ export default function CourseManagement({
     }
   };
 
+  useEffect(() => {
+    console.log(courses);
+  });
+
   // --- Table Configuration ---
   const courseColumns: Column<Course>[] = [
     { header: t("course id"), accessor: "code" },
-    lang === "en"
-      ? { header: "Name", accessor: "name" }
-      : { header: "ชื่อหลักสูตร", accessor: "name_th" },
-
-    // 🟢 Removed Section/Semester columns from display if you want grouping
-    // If you want to show "how many sections", you would need backend aggregation.
-
+    {
+      header: lang === "th" ? "ชื่อวิชา" : "Course Name",
+      accessor: lang === "th" ? "name_th" : "name",
+    },
+    // {
+    //   header: "Programs",
+    //   accessor: "code",
+    //   render: (row: any) => (
+    //     <div className="flex gap-1 flex-wrap">
+    //       {row.programs?.map((p: string) => (
+    //         <span
+    //           key={p}
+    //           className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded"
+    //         >
+    //           {p}
+    //         </span>
+    //       ))}
+    //     </div>
+    //   ),
+    // },
     {
       header: "Actions",
-      accessor: "code",
+      accessor: "id",
       actions: [
         {
           label: t("view details"),
           color: "blue",
-          hoverColor: "blue",
           onClick: (row: Course) => {
-            // When clicking, we go to details.
-            // Note: Since we have multiple sections for this code,
-            // the details page should probably list all available sections for this Master Course Code.
-            setLoadingCourse(true);
-            router.push(`/editCourse/${row.code}`);
+            router.push(`/editCourse/${row.code}`); // ไปจัดการ Sections ภายใต้รหัสนี้
           },
         },
-        // Delete button removed from grouped view because deleting "one" row
-        // implies deleting a specific section, which is ambiguous here.
       ],
     },
   ];
@@ -468,7 +463,6 @@ export default function CourseManagement({
   // };
 
   const filteredCourses = useMemo(() => {
-    // 1. กรองข้อมูลตาม Search Term ก่อน
     const searched = courses.filter((course) => {
       const term = searchTerm.toLowerCase();
       return (
@@ -478,14 +472,12 @@ export default function CourseManagement({
       );
     });
 
-    // 2. กำจัดตัวซ้ำ (Deduplication) โดยยึดตาม course.code
-    // ถ้าตัวไหน code ซ้ำกัน จะเหลือแค่ตัวเดียว
+    // Group by Code เพื่อไม่ให้วิชาเดิมโชว์ซ้ำหลายเซคชั่น
     const uniqueData = Array.from(
       new Map(searched.map((item) => [item.code, item])).values(),
     );
 
     setTotalPages(Math.ceil(uniqueData.length / limit) || 1);
-
     return uniqueData;
   }, [courses, searchTerm]);
 

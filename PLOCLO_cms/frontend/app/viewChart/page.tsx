@@ -526,67 +526,97 @@ export default function PLOChart() {
   const [ploPersentageData, setPloPercentageData] = useState<any>(null);
 
   useEffect(() => {
-    if (!selections.courseId) return;
-    setLoading(true);
-    const params = { courseId: selections.courseId };
-    const headers = { Authorization: `Bearer ${token}` };
-    Promise.all([
-      apiClient.get("/calculation/clo-plo/allStudentCourse", {
-        params,
-        headers,
-      }),
-      apiClient.get("/calculation/ass-clo/allStudentCourse", {
-        params,
-        headers,
-      }),
-      apiClient.get("/calculation/ass-clo/course/stats", { params, headers }),
-      apiClient.get("/calculation/clo-plo/course/stats", { params, headers }),
-      apiClient.get("/calculation/realScoreAndGrade/allStudentCourse", {
-        params,
-        headers,
-      }),
-      apiClient.get("/calculation/realScoreAndGrade/stats", {
-        params,
-        headers,
-      }),
-      apiClient.get("/calculation/ass-clo/course/stats/percentage", {
-        params,
-        headers,
-      }),
-      apiClient.get("/calculation/realScoreAndGrade/stats/percentage", {
-        params,
-        headers,
-      }),
-      apiClient.get("/calculation/clo-plo/course/stats/percentage", {
-        params,
-        headers,
-      }),
-    ])
-      .then(
-        ([
-          ploS,
-          cloAll,
-          cloB,
-          ploB,
-          realG,
-          assignmentStats,
-          cloPersentage,
-          assignmentPersentage,
-          ploPersentage,
-        ]) => {
-          setPloStudentData(ploS.data);
-          setCloStudentData(cloAll.data);
-          setCloBalanceData(cloB.data);
-          setPloBalanceData(ploB.data);
-          setStudentCourseAssScoreData(realG.data.studentResults || []);
-          setAssignmentBalanceData(assignmentStats.data);
-          setCloPercentageData(cloPersentage.data);
-          setAssignmentPercentageData(assignmentPersentage.data);
-          setPloPercentageData(ploPersentage.data);
-        },
-      )
-      .finally(() => setLoading(false));
+    // 1. ตรวจสอบเงื่อนไขก่อนเริ่มทำงาน
+    if (!selections.courseId || !token) return;
+
+    const fetchDashboardData = async () => {
+      setLoading(true);
+
+      const params = { courseId: selections.courseId };
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // 2. เตรียมรายการ Request ทั้งหมด
+      const apiRequests = [
+        apiClient.get("/calculation/clo-plo/allStudentCourse", {
+          params,
+          headers,
+        }), // [0]
+        apiClient.get("/calculation/ass-clo/allStudentCourse", {
+          params,
+          headers,
+        }), // [1]
+        apiClient.get("/calculation/ass-clo/course/stats", { params, headers }), // [2]
+        apiClient.get("/calculation/clo-plo/course/stats", { params, headers }), // [3]
+        apiClient.get("/calculation/realScoreAndGrade/allStudentCourse", {
+          params,
+          headers,
+        }), // [4]
+        apiClient.get("/calculation/realScoreAndGrade/stats", {
+          params,
+          headers,
+        }), // [5]
+        apiClient.get("/calculation/ass-clo/course/stats/percentage", {
+          params,
+          headers,
+        }), // [6]
+        apiClient.get("/calculation/realScoreAndGrade/stats/percentage", {
+          params,
+          headers,
+        }), // [7]
+        apiClient.get("/calculation/clo-plo/course/stats/percentage", {
+          params,
+          headers,
+        }), // [8]
+      ];
+
+      try {
+        // 3. ยิง API พร้อมกันแบบ allSettled (พังบางตัว ตัวอื่นยังไปต่อได้)
+        const results = await Promise.allSettled(apiRequests);
+
+        // 4. ฟังก์ชันตัวช่วยสำหรับเช็คสถานะและดึงข้อมูล
+        const getData = (index) => {
+          const res = results[index];
+          if (res.status === "fulfilled") {
+            return res.value.data;
+          } else {
+            console.error(`❌ API Error [Index ${index}]:`, res.reason);
+            return null; // หรือใส่ [] ตามความเหมาะสมของ State นั้นๆ
+          }
+        };
+
+        // 5. บันทึกข้อมูลลง State (ตรวจสอบทีละตัว)
+        setPloStudentData(getData(0));
+        setCloStudentData(getData(1));
+        setCloBalanceData(getData(2));
+        setPloBalanceData(getData(3));
+
+        // ตัวที่ 4 มีโครงสร้างซ้อน (studentResults)
+        const realGradeData = getData(4);
+        setStudentCourseAssScoreData(realGradeData?.studentResults || []);
+
+        setAssignmentBalanceData(getData(5));
+        setCloPercentageData(getData(6));
+        setAssignmentPercentageData(getData(7));
+        setPloPercentageData(getData(8));
+      } catch (criticalError) {
+        // กรณีเกิด Error ร้ายแรงที่ตัว JavaScript เอง (ซึ่งปกติไม่ควรเข้าตรงนี้ถ้าใช้ allSettled)
+        console.error("Critical Dashboard Error:", criticalError);
+      } finally {
+        // 6. ปิด Loading เสมอไม่ว่าจะสำเร็จหรือล้มเหลว
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
   }, [selections.courseId, token]);
+
+
+
+  useEffect(() => {
+    console.log(selections.courseId);
+    console.log(cloStudentData);
+    
+  })
 
   const [percentageStage, setPercentageStage] = useState(false);
 

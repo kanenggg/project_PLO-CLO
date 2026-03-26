@@ -284,6 +284,7 @@ export default function CLOManagement({ courseId }: CLOManagementProps) {
         showToast("API CLO error: " + err.message, "error");
       })
       .finally(() => setLoading(false));
+    
   };
 
   // Add specificCourseId to dependency array so table refreshes when selection changes

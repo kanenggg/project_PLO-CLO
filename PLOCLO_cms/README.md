@@ -109,3 +109,64 @@ Start Docker:
 bash
 docker-compose up -d --build
 The backend will automatically push the Prisma schema to the database.
+
+
+```
+ ## Fix Critical 🚨⚠️❗🚩 
+ ```
+     Fix frontend Next.js
+cd frontend
+npm install next@latest
+rmdir /s /q node_modules >>> ลบของเก่า
+npm install
+type node_modules\next\package.json | findstr "\"version\"" หรือ npx next --version ตรวจเวอร์ชัน
+
+    Fix untgz
+อยู่ path root
+npm install
+
+```
+# 🚀 CI Pipeline (SonarQube)
+
+## ⚙️ How It Works
+
+เมื่อมีการ push code ไปที่ branch `main`:
+
+- GitHub Actions จะถูก trigger อัตโนมัติ  
+- ทำการ:
+  - checkout โค้ด
+  - run SonarQube Scan  
+- ผลลัพธ์จะถูกส่งไปที่ SonarQube server
+
+---
+
+🐳 Run SonarQube =================================================================
+```bash 
+docker run -d --name sonarqube -p 9000:9000 sonarqube:lts
+เข้าใช้งาน: http://<ip>:9000
+
+==========================🔐 Create Token===========================================
+🌍 SonarQube → My Account → Security → Generate Token
+====================================================================================
+🔐 Required Secrets (สำคัญ)
+Settings → Secrets and variables → Actions → New repository secret
+1.SONAR_TOKEN เช่น f5a1b37f9b5d76d01661385e4fbaf7f644a0c3a6
+2.SONAR_HOST_URL http://<ip>:9000 เช่น http://104.197.255.217:9000
+====================================================================================
+🔧 ทางเลือก (ไม่ต้องใช้ Secrets สำหรับ SONAR_HOST_URL)
+สามารถใช้ ngrok เพื่อสร้าง public URL:
+ngrok http 9000
+จะได้ URL แบบ: https://xxxx.ngrok-free.app
+👉 เอาไปใส่ใน: SONAR_HOST_URL: https://xxxx.ngrok-free.app ในไฟล์ ci.yml
+⚠️ หมายเหตุ:
+URL ของ ngrok อาจเปลี่ยนทุกครั้งที่รัน
+====================================================================================
+
+🛠️ Troubleshooting
+❌ SonarQube scan ไม่ทำงาน
+ตรวจสอบ SONAR_TOKEN
+ตรวจสอบ URL ของ SonarQube
+
+❌ ห้ามใช้ localhost
+❌ ห้ามใช้ IP ส่วนตัว (ถ้า GitHub เข้าถึงไม่ได้)
+✅ ต้องเป็น public URL เท่านั้น

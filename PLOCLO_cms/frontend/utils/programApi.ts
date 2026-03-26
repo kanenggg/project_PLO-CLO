@@ -12,7 +12,7 @@ export interface ProgramInput {
 }
 
 export interface Program {
-  id: string;
+  id: string | number;
   program_code: string;
   faculty_id: string;
   program_name_en: string;

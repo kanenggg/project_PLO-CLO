@@ -6,7 +6,6 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import { useToast } from "@/components/Toast";
 import { Calculator } from "lucide-react";
 import { GradeDistributionChart } from "../viewChart/viewChartComponent/gradeDistributionChart";
-import { useAuth } from "../context/AuthContext";
 
 // --- Interfaces ---
 interface StudentResult {
@@ -20,26 +19,25 @@ interface StudentResult {
 }
 
 export default function ScoreCalculated({
-  masterCourseId,
+  semesterId,
   sectionId,
 }: {
-  masterCourseId: string | number;
+  semesterId: string | number;
   sectionId: string | number;
 }) {
-  const { token } = useAuth();
   const [loading, setLoading] = useState(true);
   const { ToastElement, showToast } = useToast();
   const [processedData, setProcessedData] = useState<StudentResult[]>([]);
 
   // 1. Fetch Summary Data
   useEffect(() => {
-    if (!masterCourseId || !sectionId) return;
+    if (!semesterId || !sectionId) return;
 
     const fetchSummary = async () => {
       setLoading(true);
       try {
         const res = await apiClient.get(
-          `/reports/summary?sectionId=${sectionId}&masterCourseId=${masterCourseId}`,
+          `/reports/summary?sectionId=${sectionId}`,
         );
         setProcessedData(res.data);
       } catch (err) {
@@ -51,7 +49,7 @@ export default function ScoreCalculated({
     };
 
     fetchSummary();
-  }, [masterCourseId, sectionId, showToast]);
+  }, [semesterId, sectionId, showToast]);
 
   // 🟢 2. Sort Data by Student Code
   const sortedData = useMemo(() => {
@@ -91,33 +89,32 @@ export default function ScoreCalculated({
   };
 
   useEffect(() => {
-    try {
-      const res = apiClient.get("/calculation/ass-clo/gradeSummary", {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { courseId: masterCourseId },
-      });
-      res.then((response) => {
-        setGradeSummaryData(response.data);
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  },[token, masterCourseId]);
-
-  const [gradeSummaryData, setGradeSummaryData] = useState<any>(null);
+    console.log(processedData);
+    console.log(formattedGradeData);
+    
+  })
 
   const formattedGradeData = useMemo(() => {
-    const grades = gradeSummaryData || {};
-    return Object.entries(grades)
-      .map(([grade, details]: [string, any]) => ({
-        grade,
-        count: details.count,
-      }))
-      .sort((a, b) => {
-        const order = ["A", "B+", "B", "C+", "C", "D+", "D", "F"];
-        return order.indexOf(a.grade) - order.indexOf(b.grade);
-      });
-  }, [gradeSummaryData]);
+    const students = Array.isArray(processedData) ? processedData : [];
+
+    // 1. นับจำนวนนักเรียนรายเกรด
+    const gradeCounts = students.reduce((acc: Record<string, number>, curr) => {
+      const g = curr.grade || "F";
+      acc[g] = (acc[g] || 0) + 1;
+      return acc;
+    }, {});
+
+    // 2. ลำดับเกรดมาตรฐาน
+    const order = ["A", "B+", "B", "C+", "C", "D+", "D", "F"];
+
+    // 3. แสดงเฉพาะเกรดที่มีคนได้ (count > 0)
+    return order
+      .filter((g) => gradeCounts[g] > 0) // 🟢 กรองเอาเฉพาะเกรดที่มีข้อมูลจริง
+      .map((g) => ({
+        grade: g,
+        count: gradeCounts[g],
+      }));
+  }, [processedData]);
 
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-8 relative min-h-[400px]">

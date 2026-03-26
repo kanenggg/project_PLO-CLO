@@ -5,73 +5,98 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 const router = Router();
 
-// GET /api/grade/settings/:course
-router.get("/settings/:courseId", authenticateToken, async (req, res) => {
+// 1. GET: Fetch Grade Settings by Semester ID
+router.get("/settings/:semesterId", authenticateToken, async (req, res) => {
   try {
-    const courseId = parseInt(req.params.courseId as string);
+    const semesterId = parseInt(req.params.semesterId as string);
 
-    if (isNaN(courseId)) {
-      return res.status(400).json({ error: "Invalid Course ID" });
+    if (isNaN(semesterId)) {
+      return res.status(400).json({ error: "Invalid Semester ID" });
     }
 
     const settings = await prisma.gradeSetting.findMany({
-      where: { course_id: courseId },
-      orderBy: { score: "desc" }, // Sort A -> F by default
+      // 🟢 เปลี่ยนจาก course_id เป็น semester_id (อ้างอิงตามชื่อฟิลด์ใน Schema ของคุณ)
+      where: { semester_id: semesterId },
+      orderBy: { score: "desc" },
     });
 
     res.json(settings);
   } catch (err) {
-    console.error(err);
+    console.error("Fetch Grade Settings Error:", err);
     res.status(500).json({ error: "Failed to fetch grade settings" });
   }
 });
 
-// POST /api/grade/settings
+// 2. POST: Bulk Update Grade Settings by Semester ID
 router.post("/settings", authenticateToken, async (req, res) => {
   try {
-    const { courseId , settings } = req.body;
+    const { semesterId, settings } = req.body;
 
-    // 1. Validation
-    if (!courseId || !Array.isArray(settings)) {
-      return res.status(400).json({ error: "Invalid input data" });
+    // Validation
+    if (!semesterId || !Array.isArray(settings)) {
+      return res.status(400).json({
+        error:
+          "Invalid input data. semesterId and settings array are required.",
+      });
     }
 
-    // 2. TRANSACTION: Delete old settings, then insert new ones
+    // 🟢 TRANSACTION: ลบเกณฑ์เดิมของเทอมนี้ แล้วบันทึกใหม่
     await prisma.$transaction(async (tx) => {
-      // A. Delete existing settings for this course
+      // A. ลบข้อมูลเดิมเฉพาะของ Semester นี้
       await tx.gradeSetting.deleteMany({
-        where: { course_id: courseId },
+        where: { semester_id: Number(semesterId) },
       });
 
-      // B. Insert the fresh list
+      // B. กรองเฉพาะข้อมูลที่ถูกต้อง
       const validSettings = settings.filter(
-        (s: any) => s.score !== "" && s.score !== null
+        (s: any) => s.score !== "" && s.score !== null && s.grade,
       );
 
       if (validSettings.length > 0) {
         await tx.gradeSetting.createMany({
           data: validSettings.map((item: any) => ({
-            course_id: courseId,
+            semester_id: Number(semesterId),
             grade: item.grade,
-            score: item.score,
+            score: Number(item.score), // มั่นใจว่าเป็น Number เพื่อเก็บเข้า Decimal/Float
           })),
         });
       }
     });
 
-    // 3. Fetch the newly created settings to return to frontend
-    const createdSettings = await prisma.gradeSetting.findMany({
-      where: { course_id: courseId },
+    // Fetch ข้อมูลที่อัปเดตแล้วส่งกลับไปให้ Frontend
+    const updatedSettings = await prisma.gradeSetting.findMany({
+      where: { semester_id: Number(semesterId) },
       orderBy: { score: "desc" },
     });
 
     res.json({
-      message: "Grade settings updated successfully",
-      createdSettings,
+      message: "Grade settings updated successfully for this semester",
+      updatedSettings,
     });
+  } catch (err: any) {
+    console.error("Error updating grade settings:", err);
+    res
+      .status(500)
+      .json({ error: "Failed to update grade settings", details: err.message });
+  }
+});
+
+router.delete("/settings/bulk", authenticateToken, async (req, res) => {
+  try {
+    const { semesterId } = req.body;
+
+    if (!semesterId) {
+      return res.status(400).json({ error: "semesterId is required" });
+    }
+
+    await prisma.gradeSetting.deleteMany({
+      where: { semester_id: Number(semesterId) },
+    });
+
+    res.json({ message: "All grade settings deleted for this semester" });
   } catch (err) {
-    console.error("Error updating settings:", err);
-    res.status(500).json({ error: "Failed to update grade settings" });
+    console.error("Error deleting grade settings:", err);
+    res.status(500).json({ error: "Failed to delete grade settings" });
   }
 });
 

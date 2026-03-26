@@ -234,5 +234,20 @@
   "averageScore": "คะแนนเฉลี่ย",
   "medianScore": "คะแนนมัธยฐาน",
   "assessment": "การประเมินผล",
-  "assessment-category-weights": "น้ำหนักหมวดหมู่การประเมินผล"
+  "assessment-category-weights": "น้ำหนักหมวดหมู่การประเมินผล",
+  "Delete This Section": "ลบกลุ่มเรียนนี้",
+  "Semester / Year": "ภาคเรียน / ปีการศึกษา",
+  "Section Group": "กลุ่มเรียนที่",
+  "Settings": "การตั้งค่า",
+  "Scores & Grading": "คะแนนและการให้เกรด",
+  "Grade Cutoff": "เกณฑ์การให้เกรด",
+  "Configure minimum score for each grade": "กำหนดคะแนนขั้นต่ำสำหรับแต่ละเกรด",
+  "Clear All": "ลบคะแนนทั้งหมด",
+  "Save Settings": "บันทึกการตั้งค่า",
+  "Grade Symbol": "สัญลักษณ์เกรด",
+  "Min Score Requirement": "คะแนนขั้นต่ำ",
+  "Below" : "ต่ำกว่า",
+  "Warning: Ensure scores are in descending order (A > B+ > B ...). Students who do not meet the D requirement will automatically receive an F": "คำเตือน: ตรวจสอบให้แน่ใจว่าคะแนนอยู่ในลำดับที่ลดลง (A > B+ > B ...). นักศึกษาที่ไม่ตรงตามเงื่อนไข D จะได้รับเกรด F โดยอัตโนมัติ",
+  "core": "หลักสูตรแกนกลาง",
+  "elective": "หลักสูตรเลือก"
 }

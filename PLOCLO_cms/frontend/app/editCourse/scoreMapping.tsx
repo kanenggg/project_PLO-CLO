@@ -6,6 +6,7 @@ import { useGlobalToast } from "@/app/context/ToastContext";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { Save } from "lucide-react";
 import * as XLSX from "xlsx";
+import { useTranslation } from "next-i18next";
 
 interface Assignment {
   id: number;
@@ -30,14 +31,15 @@ interface StudentScore {
 }
 
 export default function ScoreMapping({
-  masterCourseId,
+  semesterId,
   sectionId,
 }: {
-  masterCourseId: string | number;
+  semesterId: string | number;
   sectionId?: string | number;
 }) {
   const { token } = useAuth();
   const { showToast } = useGlobalToast();
+  const { t } = useTranslation("common");
 
   const [students, setStudents] = useState<Student[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -59,7 +61,7 @@ export default function ScoreMapping({
           apiClient.get(`/studentOnCourse?sectionId=${sectionId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          apiClient.get(`/assignment?sectionId=${sectionId}`, {
+          apiClient.get(`/assignment?semesterId=${semesterId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           apiClient.get(`/score?sectionId=${sectionId}`, {
@@ -87,7 +89,7 @@ export default function ScoreMapping({
     };
 
     fetchData();
-  }, [masterCourseId, sectionId, token]);
+  }, [semesterId, sectionId, token]);
 
   const sortedAssignments = useMemo(() => {
     // 1. กำหนดลำดับความสำคัญของหมวดหมู่ (Category)
@@ -303,17 +305,25 @@ export default function ScoreMapping({
     reader.readAsArrayBuffer(file);
   };
 
+  // ... ส่วนของ Logic เดิมของคุณ ...
+
   return (
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden mt-8 relative min-h-[400px]">
+    <div>
+      {/* <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl overflow-hidden mt-8 relative min-h-[500px]"> */}
       {loading && <LoadingOverlay />}
 
+      {/* Header Actions */}
+      <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-50/50 gap-4">
+        <div>
+          <h3 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em] mb-1">
+            {t("Student Grade Mapping")}
+          </h3>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+            Enter or import scores for this section
+          </p>
+        </div>
 
-      <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
-        <h3 className="font-bold text-gray-800 uppercase text-xs tracking-widest">
-          Student Scores
-        </h3>
-        <div className="flex items-center gap-3">
-          {/* Hidden Input */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
           <input
             type="file"
             id="excel-upload"
@@ -322,19 +332,24 @@ export default function ScoreMapping({
             onChange={handleExcelImport}
           />
 
-          {/* Trigger Button */}
           <label
             htmlFor="excel-upload"
-            className="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-200 cursor-pointer"
+            className="flex-1 md:flex-none px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white border border-emerald-100 cursor-pointer active:scale-95"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              fill="currentColor"
-              viewBox="0 0 256 256"
+              width="18"
+              height="18"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
             >
-              <path d="M224,48V208a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V48A16,16,0,0,1,48,32H208A16,16,0,0,1,224,48ZM208,48H48V208H208V48Z"></path>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
             Import Excel
           </label>
@@ -342,110 +357,121 @@ export default function ScoreMapping({
           <button
             onClick={handleSave}
             disabled={loading || changedKeys.size === 0}
-            className={`px-6 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+            className={`flex-1 md:flex-none px-8 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl ${
               changedKeys.size === 0
-                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                : "bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200"
+                ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60"
+                : "bg-slate-900 text-white hover:bg-blue-600 shadow-slate-200 active:scale-95"
             }`}
           >
-            <Save size={16} />
-            Save Scores
+            <Save size={18} />
+            Save Changes ({changedKeys.size})
           </button>
         </div>
       </div>
 
-      <div className="overflow-x-auto p-4">
-        <table className="w-full text-left border-collapse text-sm">
-          <thead className="bg-gray-50 text-gray-500 uppercase font-black tracking-widest">
-            <tr>
-              {/* FIX 1: Sticky Header 
-                  - Added 'bg-white' (Solid color, not transparent)
-                  - Increased 'z-30' (Highest priority to stay on top)
-              */}
-              <th className="p-4 border-b w-64 sticky left-0 bg-white z-30 shadow-md border-r">
-                Student
+      {/* Table Container */}
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left border-separate border-spacing-0">
+          <thead className="bg-slate-50/90 backdrop-blur-sm">
+            <tr className="bg-slate-50/80">
+              {/* 1. Sticky Header: Student ID */}
+              <th className="p-4 sticky left-0 bg-slate-100 z-50 border-b-2 border-r border-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                {/* 🟢 ขยายตัวอักษรเป็น text-[13px] และ font-black */}
+                <div className="w-[120px] text-[13px] font-black text-slate-500 uppercase tracking-widest text-center">
+                  {t("Student ID")}
+                </div>
               </th>
+
+              {/* 2. Sticky Header: Full Name */}
+              {/* 🟢 แก้ไข: ใช้ left-[153px] (คำนวณจากความกว้างจริงของคอลัมน์แรก) */}
+              <th className="p-4 sticky left-[153px] bg-slate-100 z-50 border-b-2 border-r border-slate-200 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.15)]">
+                <div className="w-[200px] text-[13px] font-black text-slate-500 uppercase tracking-widest text-left px-2">
+                  {t("Full Name")}
+                </div>
+              </th>
+
+              {/* 3. Dynamic Assignment Headers */}
               {sortedAssignments.map((assign, index) => (
                 <th
                   key={assign.id}
-                  className="p-2 border-b text-center min-w-[150px] border-r bg-gray-50"
+                  className="p-4 border-b-2 border-r border-slate-200 text-center min-w-[150px] bg-slate-50/50"
                 >
-                  <div className="flex flex-col">
-                    <span className="font-medium text-[14px]">
+                  <div className="flex flex-col items-center gap-1">
+                    {/* 🟢 ชื่อ Assignment ใหญ่ขึ้นเป็น text-[14px] */}
+                    <span className="text-[14px] font-black text-slate-800 leading-tight">
                       {assign.name}
                     </span>
-                    <span className="font-medium">{index + 1}</span>
-                    <span className="text-[9px] text-red-400">
-                      Max: {Number(assign.maxScore).toFixed(2)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-0.5 rounded-md bg-slate-200 text-slate-600 text-[10px] font-black">
+                        #{index + 1}
+                      </span>
+                      <span className="text-[10px] font-black text-rose-500 uppercase tracking-tighter">
+                        Limit: {Number(assign.maxScore).toFixed(1)}
+                      </span>
+                    </div>
                   </div>
                 </th>
               ))}
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-gray-50">
+          <tbody className="divide-y divide-slate-50">
             {students.length > 0 ? (
-              students.map((student, index) => {
-                const studentId =
-                  (student as Student).student_id ||
-                  (student as Student).id ||
-                  0;
-
-                const rowKey = `row-${studentId}-${index}`;
-
+              students.map((student) => {
+                const sId = student.student_id || student.id || 0;
                 return (
                   <tr
-                    key={rowKey}
-                    className="group hover:bg-blue-50/30 transition-all"
+                    key={sId}
+                    className="group hover:bg-slate-100 transition-colors"
                   >
-                    {/* FIX 2: Sticky Body Cell 
-                        - Added 'bg-white' (Solid background is crucial!)
-                        - Added 'z-20' (Higher than scrolling cells)
-                        - Added 'shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]' (Optional: nice shadow on the right edge)
-                    */}
-                    <td className="p-4 font-bold text-gray-700 sticky left-0 bg-white border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] z-20">
-                      <div className="flex flex-col w-[200px]">
-                        <span>
-                          {student.first_name} {student.last_name}
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-medium">
+                    {/* 1. คอลัมน์รหัสนิสิต (Sticky) */}
+                    <td className="p-5 sticky left-0 bg-white group-hover:bg-slate-50 transition-colors z-20 border-r border-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                      <div className="flex flex-col w-[120px]">
+                        <span className="text-sm font-light text-slate-500 tracking-tight">
                           {student.student_code}
                         </span>
                       </div>
                     </td>
 
+                    {/* 2. คอลัมน์ชื่อ-นามสกุล (Sticky) */}
+                    <td className="p-5 sticky left-[152px] bg-white group-hover:bg-slate-50 transition-colors z-20 border-r border-slate-100 shadow-[4px_0_10px_-4px_rgba(0,0,0,0.1)]">
+                      <div className="flex flex-col w-[220px]">
+                        {/* 🟢 ปรับชื่อเป็น text-base (ใหญ่ขึ้น) และ font-black */}
+                        <span className="text-base font-light text-slate-900 truncate">
+                          {student.first_name} {student.last_name}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Score Inputs */}
                     {sortedAssignments.map((assign) => {
-                      const key = `${studentId}_${assign.id}`;
-                      const rawScore = scoreGrid[key];
-                      const hasValue = rawScore !== undefined;
-                      const inputValue = hasValue ? rawScore : "";
+                      const key = `${sId}_${assign.id}`;
+                      const val = scoreGrid[key] ?? "";
                       const isChanged = changedKeys.has(key);
 
                       return (
                         <td
                           key={assign.id}
-                          className={`p-1 border-r text-center ${
-                            isChanged ? "bg-yellow-50" : ""
+                          className={`p-1 border-r border-slate-100 min-w-[120px] transition-colors ${
+                            isChanged
+                              ? "bg-amber-50 group-hover:bg-amber-100/50"
+                              : "group-hover:bg-slate-100"
                           }`}
                         >
                           <input
                             type="text"
-                            min="0"
-                            max={assign.maxScore}
-                            className={`w-full h-full text-center py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent font-medium 
-                            ${hasValue ? "text-blue-700" : "text-gray-400"}
-                            ${
-                              isChanged
-                                ? "ring-2 ring-yellow-200 bg-yellow-50"
-                                : ""
-                            }
-                            `}
                             placeholder="-"
-                            value={inputValue}
+                            className={`w-full h-14 text-center text-lg font-black transition-all outline-none rounded-xl ${
+                              isChanged
+                                ? "bg-white text-amber-600 ring-2 ring-amber-200"
+                                : val !== ""
+                                  ? "bg-transparent text-blue-700 focus:bg-white focus:ring-4 focus:ring-blue-100"
+                                  : "bg-transparent text-slate-300 focus:bg-white focus:ring-4 focus:ring-slate-100"
+                            }`}
+                            value={val}
                             onChange={(e) =>
                               handleScoreChange(
-                                studentId,
+                                sId,
                                 assign.id,
                                 e.target.value,
                                 assign.maxScore,
@@ -461,15 +487,39 @@ export default function ScoreMapping({
             ) : (
               <tr>
                 <td
-                  colSpan={sortedAssignments.length + 1}
-                  className="p-10 text-center text-gray-400 italic"
+                  colSpan={sortedAssignments.length + 2}
+                  className="py-20 text-center"
                 >
-                  No students found in this course.
+                  <div className="flex flex-col items-center opacity-20">
+                    <svg
+                      className="w-16 h-16 mb-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1}
+                        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+                      />
+                    </svg>
+                    <p className="text-sm font-black uppercase tracking-widest">
+                      No students found
+                    </p>
+                  </div>
                 </td>
               </tr>
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Footer Hint */}
+      <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">
+          * Scores are saved locally until you click &quot;Save Changes&quot;
+        </p>
       </div>
     </div>
   );

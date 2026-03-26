@@ -236,6 +236,7 @@ export default function AddPlo({ programId }: AddPloProps) {
 
       showToast(`ลบ PLO สำเร็จ ${selectedPloIds.length} รายการ`, "success");
       setSelectedPloIds([]); // ล้างค่าที่เลือก
+      setPage(1); // กลับไปหน้าแรกหลังลบ
       fetchPlos(); // รีเฟรชข้อมูล
     } catch {
       showToast("ไม่สามารถลบข้อมูลแบบกลุ่มได้", "error");

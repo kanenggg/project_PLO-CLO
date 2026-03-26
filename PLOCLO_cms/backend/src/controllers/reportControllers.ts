@@ -1,30 +1,37 @@
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
+// 1. สรุปภาพรวมรายวิชา (รวมทุก Section ใน Semester เดียวกัน)
 export const getGradeSummary = async (req: any, res: any) => {
-  const { courseId } = req.query;
+  const { semesterId } = req.query;
 
-  if (!courseId) {
-    return res.status(400).json({ message: "Missing courseId" });
-  }
+  if (!semesterId)
+    return res.status(400).json({ message: "Missing semesterId" });
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const [assignments, gradeSettings, courseSections] = await Promise.all([
-        tx.assignment.findMany({ where: { section: { course_id: Number(courseId) } } }),
+      // 🟢 ดึงข้อมูลพื้นฐานที่แชร์กันทั้งเทอม
+      const [assignments, gradeSettings, semesterData] = await Promise.all([
+        tx.assignment.findMany({ where: { semester_id: Number(semesterId) } }),
         tx.gradeSetting.findMany({
-          where: { course_id: Number(courseId) },
+          where: { semester_id: Number(semesterId) },
           orderBy: { score: "desc" },
         }),
-        tx.courseSection.findMany({
-          where: { course_id: Number(courseId) },
+        tx.courseSemester.findUnique({
+          where: { id: Number(semesterId) },
           include: {
-            students: {
+            sections: {
               include: {
-                student: {
+                students: {
                   include: {
-                    scores: {
-                      where: { assignment: { section: { course_id: Number(courseId) } } },
+                    student: {
+                      include: {
+                        scores: {
+                          where: {
+                            assignment: { semester_id: Number(semesterId) },
+                          },
+                        },
+                      },
                     },
                   },
                 },
@@ -34,22 +41,24 @@ export const getGradeSummary = async (req: any, res: any) => {
         }),
       ]);
 
-      // 1. Calculate Full Scores per Category with 4-digit rounding
+      if (!semesterData) throw new Error("SEMESTER_NOT_FOUND");
+
+      // คำนวณคะแนนเต็มรวมของแต่ละหมวดหมู่
       const categoryFullScores: Record<string, number> = {};
       assignments.forEach((assign) => {
-        const cat = assign.category;
-        const weight = Number(assign.weight) || 0;
-        const currentTotal = categoryFullScores[cat] || 0;
-        // Rounding to 4 digits to prevent floating point drift
-        categoryFullScores[cat] = Number((currentTotal + weight).toFixed(4));
+        categoryFullScores[assign.category] = Number(
+          (
+            (categoryFullScores[assign.category] || 0) + Number(assign.weight)
+          ).toFixed(4),
+        );
       });
 
+      // จัดการรวบรวมนักเรียนจากทุก Section
       const studentMap = new Map();
-      courseSections.forEach((section) => {
-        section.students.forEach((record) => {
-          if (!studentMap.has(record.student.id))
-            studentMap.set(record.student.id, record.student);
-        });
+      semesterData.sections.forEach((sec) => {
+        sec.students.forEach((rec) =>
+          studentMap.set(rec.student.id, rec.student),
+        );
       });
 
       const studentSummaries = Array.from(studentMap.values()).map(
@@ -58,26 +67,25 @@ export const getGradeSummary = async (req: any, res: any) => {
           const categoryEarnedScores: Record<string, number> = {};
 
           assignments.forEach((assign) => {
-            const scoreRecord = student.scores.find(
+            const scoreRec = student.scores.find(
               (s: any) => s.assignment_id === assign.id,
             );
+            const raw = scoreRec ? Number(scoreRec.score) : 0;
 
-            const rawScore = scoreRecord ? Number(scoreRecord.score) : 0;
-            const max = Number(assign.maxScore) || 100;
-            const weight = Number(assign.weight) || 0;
+            // สูตร: (คะแนนดิบ / คะแนนเต็มข้อ) * น้ำหนักข้อนั้น
+            const weighted =
+              (raw / Number(assign.maxScore)) * Number(assign.weight);
 
-            const weighted = (rawScore / max) * weight;
             totalWeightedScore += weighted;
-
-            const cat = assign.category;
-            const currentEarned = categoryEarnedScores[cat] || 0;
-            // 🟢 ROUNDING EARNED SCORE TO 4 DIGITS
-            categoryEarnedScores[cat] = Number(
-              (currentEarned + weighted).toFixed(4),
+            categoryEarnedScores[assign.category] = Number(
+              ((categoryEarnedScores[assign.category] || 0) + weighted).toFixed(
+                4,
+              ),
             );
           });
 
-          const assignedGrade =
+          // 🟢 ตัดเกรดตามเกณฑ์ของ Semester นี้
+          const grade =
             gradeSettings.find((g) => totalWeightedScore >= Number(g.score))
               ?.grade || "F";
 
@@ -87,88 +95,86 @@ export const getGradeSummary = async (req: any, res: any) => {
             first_name: student.first_name,
             last_name: student.last_name,
             categoryEarnedScores,
-            totalScore: Number(totalWeightedScore.toFixed(4)), // Capped at 4 digits
-            grade: assignedGrade,
+            totalScore: Number(totalWeightedScore.toFixed(2)),
+            grade,
           };
         },
       );
 
-      return {
-        categoryFullScores,
-        students: studentSummaries,
-      };
+      return { categoryFullScores, students: studentSummaries };
     });
 
     return res.status(200).json(result);
   } catch (error: any) {
-    return res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: error.message });
   }
 };
 
+// 2. สรุปราย Section
 export const getSectionGradeSummary = async (req: any, res: any) => {
-  const { sectionId, masterCourseId } = req.query;
-
-  if (!sectionId || !masterCourseId) {
-    return res
-      .status(400)
-      .json({ message: "Missing sectionId or masterCourseId" });
-  }
+  const { sectionId } = req.query;
+  if (!sectionId) return res.status(400).json({ message: "Missing sectionId" });
 
   try {
-    // ใช้ Transaction ภายใน Controller (ถ้าต้องการ)
     const result = await prisma.$transaction(async (tx) => {
-      const [sectionData, assignments, gradeSettings] = await Promise.all([
-        tx.courseSection.findUnique({
-          where: { id: Number(sectionId) },
-          include: {
-            students: {
-              include: {
-                student: {
-                  include: {
-                    scores: {
-                      where: {
-                        assignment: { section: { course_id: Number(masterCourseId) } },
-                      },
-                    },
-                  },
-                },
+      // 1. ดึงข้อมูลพื้นฐานของ Section และ Assignment ก่อน
+      const sectionInfo = await tx.courseSection.findUnique({
+        where: { id: Number(sectionId) },
+        include: {
+          semester_config: {
+            include: {
+              assignments: true,
+              gradeSettings: { orderBy: { score: "desc" } },
+            },
+          },
+        },
+      });
+
+      if (!sectionInfo) throw new Error("SECTION_NOT_FOUND");
+
+      // 2. 🟢 เปลี่ยนมาดึงจาก Table การลงทะเบียน (Enrollment Table) โดยตรง
+      // เพื่อให้มั่นใจว่าได้เฉพาะรายชื่อนิสิตใน Section นี้เท่านั้น
+      const enrollments = await tx.studentOnSection.findMany({
+        where: { section_id: Number(sectionId) },
+        include: {
+          student: {
+            include: {
+              scores: {
+                // ดึงเฉพาะคะแนนที่เกิดขึ้นใน Section นี้
+                where: { section_id: Number(sectionId) },
               },
             },
           },
-        }),
-        tx.assignment.findMany({
-          where: { section: { course_id: Number(masterCourseId) } },
-        }),
-        tx.gradeSetting.findMany({
-          where: { course_id: Number(masterCourseId) },
-          orderBy: { score: "desc" },
-        }),
-      ]);
+        },
+      });
 
-      if (!sectionData) throw new Error("SECTION_NOT_FOUND");
+      const assignments = sectionInfo.semester_config.assignments;
+      const gradeSettings = sectionInfo.semester_config.gradeSettings;
 
-      return sectionData.students.map((record) => {
-        const student = record.student;
-        let totalWeightedScore = 0;
+      // 3. คำนวณคะแนนจากรายการ Enrollment
+      return enrollments.map((enroll) => {
+        const student = enroll.student;
+        let totalWeighted = 0;
         const categoryScores: Record<string, number> = {};
 
         assignments.forEach((assign) => {
-          const scoreRecord = student.scores.find(
+          const scoreRec = student.scores.find(
             (s) => s.assignment_id === assign.id,
           );
-          const rawScore = scoreRecord ? Number(scoreRecord.score) : 0;
-          const max = Number(assign.maxScore) || 100;
-          const weight = Number(assign.weight) || 0;
 
-          const weighted = (rawScore / max) * weight;
-          categoryScores[assign.category] =
-            (categoryScores[assign.category] || 0) + weighted;
-          totalWeightedScore += weighted;
+          const rawScore = scoreRec ? Number(scoreRec.score) : 0;
+          const weighted =
+            (rawScore / Number(assign.maxScore)) * Number(assign.weight);
+
+          categoryScores[assign.category] = Number(
+            ((categoryScores[assign.category] || 0) + weighted).toFixed(4),
+          );
+          totalWeighted += weighted;
         });
 
-        const assignedGrade =
-          gradeSettings.find((g) => totalWeightedScore >= Number(g.score))
-            ?.grade || "F";
+        const finalGrade =
+          gradeSettings.find((g) => totalWeighted >= Number(g.score))?.grade ||
+          "F";
 
         return {
           student_id: student.id,
@@ -176,88 +182,73 @@ export const getSectionGradeSummary = async (req: any, res: any) => {
           first_name: student.first_name,
           last_name: student.last_name,
           categoryScores,
-          totalScore: Number(totalWeightedScore.toFixed(2)),
-          grade: assignedGrade,
+          totalScore: Number(totalWeighted.toFixed(2)),
+          grade: finalGrade,
         };
       });
     });
 
-    // ส่ง Response ออกไปที่นี่ที่เดียว
     return res.status(200).json(result);
   } catch (error: any) {
-    console.error("Report Error:", error);
-    if (error.message === "SECTION_NOT_FOUND") {
-      return res.status(404).json({ message: "Section not found" });
-    }
-    return res.status(500).json({ message: "Internal server error" });
+    res.status(500).json({ message: error.message });
   }
 };
 
+// 3. สรุปรายบุคคล
 export const getIndividualStudentSummary = async (req: any, res: any) => {
-  const { studentId, masterCourseId } = req.query;
+  const { studentId, semesterId } = req.query;
 
-  if (!studentId || !masterCourseId) {
-    return res
-      .status(400)
-      .json({ message: "Missing studentId or masterCourseId" });
-  }
+  if (!studentId || !semesterId)
+    return res.status(400).json({ message: "Missing params" });
 
   try {
-    const [student, assignments, gradeSettings] = await Promise.all([
-      // 1. ดึงข้อมูลนักเรียนและคะแนนเฉพาะวิชานี้
+    const [student, assignments, semesterInfo] = await Promise.all([
       prisma.student.findUnique({
         where: { id: Number(studentId) },
         include: {
           scores: {
-            where: { assignment: { section: { course_id: Number(masterCourseId) } } },
+            where: { assignment: { semester_id: Number(semesterId) } },
             include: { assignment: true },
           },
         },
       }),
-      // 2. ดึงรายการงานทั้งหมดในวิชานี้ (เพื่อหาตัวหาร)
       prisma.assignment.findMany({
-        where: { section: { course_id: Number(masterCourseId) } },
+        where: { semester_id: Number(semesterId) },
       }),
-      // 3. ดึงเกณฑ์การตัดเกรด
-      prisma.gradeSetting.findMany({
-        where: { course_id: Number(masterCourseId) },
-        orderBy: { score: "desc" },
+      prisma.courseSemester.findUnique({
+        where: { id: Number(semesterId) },
+        include: { gradeSettings: { orderBy: { score: "desc" } } }, // 🟢 ดึงจาก SemesterConfig
       }),
     ]);
 
-    if (!student) return res.status(404).json({ message: "Student not found" });
+    if (!student || !semesterInfo)
+      return res.status(404).json({ message: "Data not found" });
 
-    let totalWeightedScore = 0;
+    let totalWeighted = 0;
     const categoryBreakdown: Record<
       string,
       { earned: number; possible: number }
     > = {};
 
-    // 4. คำนวณคะแนนถ่วงน้ำหนัก
     assignments.forEach((assign) => {
-      const scoreRecord = student.scores.find(
+      const scoreRec = student.scores.find(
         (s) => s.assignment_id === assign.id,
       );
-      const rawScore = scoreRecord ? Number(scoreRecord.score) : 0;
-      const max = Number(assign.maxScore) || 100;
-      const weight = Number(assign.weight) || 0;
+      const earned =
+        (Number(scoreRec?.score || 0) / Number(assign.maxScore)) *
+        Number(assign.weight);
 
-      const weighted = (rawScore / max) * weight;
-
-      // เก็บประวัติคะแนนแยกตามหมวดหมู่
       if (!categoryBreakdown[assign.category]) {
         categoryBreakdown[assign.category] = { earned: 0, possible: 0 };
       }
-      categoryBreakdown[assign.category].earned += weighted;
-      categoryBreakdown[assign.category].possible += weight;
-
-      totalWeightedScore += weighted;
+      categoryBreakdown[assign.category].earned += earned;
+      categoryBreakdown[assign.category].possible += Number(assign.weight);
+      totalWeighted += earned;
     });
 
-    // 5. ตัดเกรด
-    const finalGrade =
-      gradeSettings.find((g) => totalWeightedScore >= Number(g.score))?.grade ||
-      "F";
+    const grade =
+      semesterInfo.gradeSettings.find((g) => totalWeighted >= Number(g.score))
+        ?.grade || "F";
 
     res.json({
       info: {
@@ -265,11 +256,8 @@ export const getIndividualStudentSummary = async (req: any, res: any) => {
         code: student.student_code,
         name: `${student.first_name} ${student.last_name}`,
       },
-      summary: {
-        totalScore: Number(totalWeightedScore.toFixed(2)),
-        grade: finalGrade,
-      },
-      categories: categoryBreakdown, // เพื่อเอาไปทำกราฟ Radar หรือ Bar รายบุคคล
+      summary: { totalScore: Number(totalWeighted.toFixed(2)), grade },
+      categories: categoryBreakdown,
     });
   } catch (error) {
     res.status(500).json({ message: "Internal server error" });

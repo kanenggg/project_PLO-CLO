@@ -15,11 +15,7 @@ interface WeightEntry {
   maxWeight: number;
 }
 
-export default function AssignmentCateWeight({
-  sectionId,
-}: {
-  sectionId: string;
-}) {
+export default function AssignmentCateWeight({ semesterId }: { semesterId: string }) {
   const { showToast } = useGlobalToast();
   const { t } = useTranslation("common");
   const { token } = useAuth();
@@ -44,11 +40,11 @@ export default function AssignmentCateWeight({
   ];
 
   const fetchData = async () => {
-    if (!sectionId) return;
+    if (!semesterId) return;
     try {
       setLoading(true);
       const res = await apiClient.get("/assignment/categoriesWeights", {
-        params: { sectionId },
+        params: { semesterId },
       });
 
       // Map ข้อมูลให้ตรงกับ Interface
@@ -71,7 +67,7 @@ export default function AssignmentCateWeight({
   // 3. Fetch ข้อมูลและเก็บ ID ไว้ด้วย
   useEffect(() => {
     fetchData();
-  }, [sectionId]);
+  }, [semesterId]);
 
   const hasChanges = useMemo(() => {
     if (weights.length !== initialWeights.length) return true;
@@ -140,7 +136,7 @@ export default function AssignmentCateWeight({
     setSaving(true);
     try {
       const payload = {
-        section_id: Number(sectionId),
+        semesterId: Number(semesterId),
         weights: weights.map((w) => ({
           category: w.category,
           maxWeight: w.maxWeight,
@@ -154,7 +150,7 @@ export default function AssignmentCateWeight({
 
       // Refresh data เพื่อเอา ID ใหม่จาก DB
       const res = await apiClient.get("/assignment/categoriesWeights", {
-        params: { sectionId },
+        params: { semesterId },
       });
       setWeights(
         res.data.map((item: any) => ({
@@ -181,8 +177,6 @@ export default function AssignmentCateWeight({
 
   return (
     <div className="p-8 max-w-2xl mx-auto bg-white shadow-2xl rounded-[2rem] border border-slate-100 mt-10">
-
-
       <div className="mb-8">
         <h1 className="text-2xl font-black text-slate-800 tracking-tight">
           Assignment <span className="text-blue-600">Weights</span>

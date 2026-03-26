@@ -39,7 +39,7 @@ router.get("/", authenticateToken, async (req, res) => {
       params.push(facultyId);
     }
 
-    query += ` ORDER BY p.program_year DESC`; // Sorted by code usually better for dropdowns
+    query += ` ORDER BY p.id DESC`; // Sorted by code usually better for dropdowns
 
     const result = await pool.query(query, params);
     res.json(result.rows);

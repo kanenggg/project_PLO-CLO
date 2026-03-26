@@ -5,188 +5,129 @@ import { PrismaClient } from "@prisma/client";
 const router = Router();
 const prisma = new PrismaClient();
 
-// 1. GET: Fetch assignments (Filter by COURSE ID, not Section)
+// 1. GET: ดึงรายการงาน (Filter by Semester ID)
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    // Assignments are now defined at the Course level, so we filter by courseId
-    const sectionId = req.query.sectionId
-      ? Number(req.query.sectionId)
-      : undefined;
-
-    if (!sectionId) {
-      return res
-        .status(400)
-        .json({ error: "sectionId query parameter is required" });
-    }
+    const semesterId = Number(req.query.semesterId);
+    if (!semesterId)
+      return res.status(400).json({ error: "semesterId is required" });
 
     const assignments = await prisma.assignment.findMany({
-      where: { section_id: sectionId },
+      where: { semester_id: semesterId },
       orderBy: { createdAt: "asc" },
     });
 
     res.json(assignments);
   } catch (err: any) {
-    console.error(err);
     res.status(500).json({ error: "Failed to fetch assignments" });
   }
 });
 
-// 2. POST: Create a new assignment
+router.post("/bulk", authenticateToken, async (req, res) => {
+  const { semesterId, assignments } = req.body;
+
+  if (!semesterId || !Array.isArray(assignments)) {
+    return res
+      .status(400)
+      .json({ error: "semesterId and assignments array are required" });
+  }
+
+  try {
+    // 🟢 ใช้ createMany เพื่อความรวดเร็วและตรงตาม Schema
+    const result = await prisma.assignment.createMany({
+      data: assignments.map((a: any) => ({
+        semester_id: Number(semesterId), // อ้างอิงชื่อฟิลด์ตาม Schema
+        name: a.name,
+        description: a.description || "",
+        category: a.category,
+        // Prisma จะจัดการ Decimal ให้เองเมื่อเราส่ง Number เข้าไป
+        maxScore: Number(a.maxScore || 100),
+        weight: Number(a.weight || 0),
+      })),
+      skipDuplicates: false, // ถ้าต้องการให้ Error เมื่อมีข้อมูลซ้ำให้เป็น false
+    });
+
+    res.json({
+      success: true,
+      count: result.count,
+      message: `Successfully imported ${result.count} assignments`,
+    });
+  } catch (err: any) {
+    console.error("Bulk Insert Error:", err);
+    res
+      .status(500)
+      .json({ error: "Database operation failed", details: err.message });
+  }
+});
+
+// 2. POST: สร้างงานใหม่ (Linked to Semester Directly)
 router.post("/", authenticateToken, async (req, res) => {
   try {
-    // Note: 'course_id' replaces 'section_id'
-    const { section_id, name, description, category, maxScore, weight } =
+    const { semesterId, name, description, category, maxScore, weight } =
       req.body;
 
-    // Validation
-    if (!section_id || !name) {
-      return res.status(400).json({ error: "course_id and name are required" });
+    if (!semesterId || !name) {
+      return res
+        .status(400)
+        .json({ error: "semesterId and name are required" });
     }
 
     const newAssignment = await prisma.assignment.create({
       data: {
-        section_id: Number(section_id),
+        semester_id: Number(semesterId),
         name,
         description: description || "",
         category: category || "assignment",
         maxScore: Number(maxScore ?? 100),
         weight: Number(weight ?? 0),
-        createdAt: new Date(),
       },
     });
 
     res.status(201).json(newAssignment);
   } catch (err: any) {
-    console.error(err);
     res.status(500).json({ error: "Failed to create assignment" });
   }
 });
 
-router.post("/bulk", authenticateToken, async (req, res) => {
-  try {
-    const { assignments } = req.body; // Expecting an array of assignments
-
-    if (!Array.isArray(assignments) || assignments.length === 0) {
-      return res.status(400).json({ error: "assignments array is required" });
-    }
-
-    const createdAssignments = await prisma.assignment.createMany({
-      data: assignments.map((a: any) => ({
-        section_id: Number(a.section_id),
-        name: a.name,
-        description: a.description || "",
-        category: a.category,
-        maxScore: Number(a.maxScore ?? 100),
-        weight: Number(a.weight ?? 0),
-        createdAt: new Date(),
-      })),
-    });
-
-    res.status(201).json({
-      message: `${createdAssignments.count} assignments created successfully`,
-    });
-  } catch (err: any) {
-    console.error("Bulk Create Error:", err);
-    res.status(500).json({ error: "Failed to create assignments in bulk" });
-  }
-});
-
-// 3. DELETE: Remove an assignment
-router.delete("/:id", authenticateToken, async (req, res) => {
-  try {
-    const assignmentId = Number(req.params.id);
-
-    await prisma.assignment.delete({
-      where: { id: assignmentId },
-    });
-
-    res.json({ message: "Assignment deleted successfully" });
-  } catch (err: any) {
-    console.error(err);
-    if (err.code === "P2025") {
-      return res.status(404).json({ error: "Assignment not found" });
-    }
-    res.status(500).json({ error: "Failed to delete assignment" });
-  }
-});
-
-// 4. PATCH: Update an assignment
-router.patch("/:id", authenticateToken, async (req, res) => {
-  try {
-    const assignmentId = Number(req.params.id);
-    const { name, description, maxScore, weight, category } = req.body;
-
-    const updatedAssignment = await prisma.assignment.update({
-      where: { id: assignmentId },
-      data: {
-        name,
-        description,
-        maxScore: maxScore !== undefined ? Number(maxScore) : undefined,
-        weight: weight !== undefined ? Number(weight) : undefined,
-        category,
-      },
-    });
-
-    res.json(updatedAssignment);
-  } catch (err: any) {
-    console.error(err);
-    if (err.code === "P2025") {
-      return res.status(404).json({ error: "Assignment not found" });
-    }
-    res.status(500).json({ error: "Failed to update assignment" });
-  }
-});
-
-// GET: ดึงเกณฑ์น้ำหนักของแต่ละหมวดในวิชานั้นๆ
+// 3. GET: ดึงเกณฑ์น้ำหนักหมวดหมู่ (Fetch by Semester ID)
 router.get("/categoriesWeights", authenticateToken, async (req, res) => {
   try {
-    const sectionId = req.query.sectionId
-      ? Number(req.query.sectionId)
-      : undefined;
-
-    if (!sectionId || isNaN(sectionId)) {
-      return res
-        .status(400)
-        .json({ error: "Valid sectionId query parameter is required" });
-    }
+    const semesterId = Number(req.query.semesterId);
+    if (!semesterId)
+      return res.status(400).json({ error: "semesterId is required" });
 
     const categoryWeights = await prisma.assignmentCategoryWeight.findMany({
-      where: { section_id: sectionId },
-      orderBy: { category: "asc" }, // เรียงลำดับให้แสดงผลในหน้าบ้านง่ายขึ้น
+      where: { semester_id: semesterId },
+      orderBy: { category: "asc" },
     });
 
     res.json(categoryWeights);
   } catch (err: any) {
-    console.error("GET Error:", err);
     res.status(500).json({ error: "Failed to fetch category weights" });
   }
 });
 
-// POST: บันทึกหรือแก้ไขเกณฑ์น้ำหนัก
+// 4. POST: บันทึก/แก้ไขน้ำหนักหมวดหมู่ (Shared by Semester ID)
 router.post("/categoriesWeights", authenticateToken, async (req, res) => {
   try {
-    const { sectionId, category, maxWeight } = req.body;
+    const { semesterId, category, maxWeight } = req.body;
 
-    // ตรวจสอบค่าที่ส่งมา (maxWeight อาจเป็น 0 ได้ จึงเช็ค undefined)
-    if (!sectionId || !category || maxWeight === undefined) {
-      return res.status(400).json({
-        error: "sectionId, category, and maxWeight are required",
-      });
+    if (!semesterId || !category) {
+      return res
+        .status(400)
+        .json({ error: "semesterId and category are required" });
     }
 
-    // Upsert: ถ้ามีคู่ (section_id, category) เดิมอยู่แล้วจะ Update ถ้าไม่มีจะ Create
     const updatedRecord = await prisma.assignmentCategoryWeight.upsert({
       where: {
-        section_id_category: {
-          section_id: Number(sectionId),
+        semester_id_category: {
+          semester_id: Number(semesterId),
           category: category,
         },
       },
-      update: {
-        maxWeight: parseFloat(maxWeight),
-      },
+      update: { maxWeight: parseFloat(maxWeight) },
       create: {
-        section_id: Number(sectionId),
+        semester_id: Number(semesterId),
         category: category,
         maxWeight: parseFloat(maxWeight),
       },
@@ -194,54 +135,83 @@ router.post("/categoriesWeights", authenticateToken, async (req, res) => {
 
     res.json(updatedRecord);
   } catch (err: any) {
-    console.error("POST Error:", err);
-    // กรณีที่ส่ง Enum category ผิด หรือ Prisma error อื่นๆ
     res.status(500).json({ error: "Failed to update category weight" });
   }
 });
 
+// 5. POST: บันทึกน้ำหนักแบบกลุ่ม (Bulk Upsert by Semester ID)
 router.post("/categoriesWeights/bulk", authenticateToken, async (req, res) => {
-  const { section_id, weights } = req.body; // weights: [{category: 'quiz', maxWeight: 20}, ...]
+  // 🟢 รับ semesterId มาจาก body ให้ตรงกับโครงสร้าง Hierarchy ใหม่
+  const { semesterId, weights } = req.body;
+
+  if (!semesterId || !Array.isArray(weights)) {
+    return res
+      .status(400)
+      .json({ error: "semesterId and weights array are required" });
+  }
 
   try {
     const results = await prisma.$transaction(
       weights.map((w: any) =>
         prisma.assignmentCategoryWeight.upsert({
           where: {
-            section_id_category: {
-              section_id: Number(section_id),
+            // 🟢 อ้างอิงตาม @@unique([semester_id, category]) ใน Schema
+            semester_id_category: {
+              semester_id: Number(semesterId),
               category: w.category,
             },
           },
-          update: { maxWeight: parseFloat(w.maxWeight) },
+          update: {
+            maxWeight: Number(w.maxWeight) || 0,
+          },
           create: {
-            section_id: Number(section_id),
+            semester_id: Number(semesterId),
             category: w.category,
-            maxWeight: parseFloat(w.maxWeight),
+            maxWeight: Number(w.maxWeight) || 0,
           },
         }),
       ),
     );
-    res.json(results);
-  } catch (err) {
-    res.status(500).json({ error: "Bulk update failed" });
+
+    res.json({
+      success: true,
+      message: `Updated ${results.length} category weights for semester ${semesterId}`,
+      data: results,
+    });
+  } catch (err: any) {
+    console.error("Bulk Category Weight Error:", err);
+    res.status(500).json({
+      error: "Bulk update failed",
+      details: err.message,
+    });
   }
 });
 
-// ลบโดยใช้ ID ของ Record นั้นๆ โดยตรง
-router.delete("/categoriesWeights/:id", authenticateToken, async (req, res) => {
-  const { id } = req.params;
+// PATCH /assignment/bulk-weights
+router.patch("/bulk-weights", authenticateToken, async (req, res) => {
+  const { semesterId, updates } = req.body;
+
+  if (!semesterId || !Array.isArray(updates)) {
+    return res.status(400).json({ error: "semesterId and updates array are required" });
+  }
 
   try {
-    await prisma.assignmentCategoryWeight.delete({
-      where: {
-        id: Number(id), // ลบด้วย Unique ID
-      },
-    });
-    res.json({ message: "Category weight deleted successfully" });
+    await prisma.$transaction(
+      updates.map((item) =>
+        prisma.assignment.updateMany({
+          where: { 
+            id: Number(item.id),
+            semester_id: Number(semesterId) // ตรวจสอบความถูกต้องของ Semester
+          },
+          data: { 
+            weight: Number(item.weight) 
+          },
+        })
+      )
+    );
+    res.json({ success: true, message: "Assignment weights updated" });
   } catch (err) {
-    console.error("Delete Error:", err);
-    res.status(500).json({ error: "Failed to delete category weight" });
+    res.status(500).json({ error: "Failed to update assignment weights" });
   }
 });
 

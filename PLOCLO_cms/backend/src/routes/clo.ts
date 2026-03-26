@@ -1,277 +1,255 @@
-import { Router } from "express";
-import { pool } from "../db";
+import { Router, Request, Response } from "express";
 import { authenticateToken } from "../middleware/authMiddleware";
+import { PrismaClient, Prisma } from "@prisma/client";
 
+const prisma = new PrismaClient();
 const router = Router();
 
+// Helper สำหรับแปลงเลข
+const parseIntSafe = (value: any) => {
+  if (!value) return undefined;
+  const parsed = parseInt(String(value));
+  return isNaN(parsed) ? undefined : parsed;
+};
+
 // =========================================
-// 1. GET /paginate (For the Table)
+// 1. GET /paginate (สำหรับแสดงผลตาราง)
 // =========================================
-router.get("/paginate", authenticateToken, async (req, res) => {
+router.get(
+  "/paginate",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const universityId = parseIntSafe(req.query.universityId);
+      const facultyId = parseIntSafe(req.query.facultyId);
+      const programId = parseIntSafe(req.query.programId);
+      const year = parseIntSafe(req.query.year);
+      const semester = parseIntSafe(req.query.semester);
+      const section = parseIntSafe(req.query.section);
+      const courseId = parseIntSafe(req.query.courseId);
+
+      const page = parseIntSafe(req.query.page) || 1;
+      const limit = parseIntSafe(req.query.limit) || 10;
+      const skip = (page - 1) * limit;
+
+      const where: any = {
+        course: {
+          id: courseId || undefined,
+          faculty_id: facultyId || undefined,
+          faculty: universityId ? { university_id: universityId } : undefined,
+          semesters:
+            year || semester || programId
+              ? {
+                  some: {
+                    year: year || undefined,
+                    semester: semester || undefined,
+                    programOnCourses: programId
+                      ? { some: { program_id: programId } }
+                      : undefined,
+                    sections: section
+                      ? { some: { section: section } }
+                      : undefined,
+                  },
+                }
+              : undefined,
+        },
+      };
+
+      const [total, clos] = await prisma.$transaction([
+        prisma.clo.count({ where }),
+        prisma.clo.findMany({
+          where,
+          include: {
+            course: {
+              include: {
+                semesters: {
+                  where: year ? { year } : {},
+                  include: {
+                    programOnCourses: { include: { program: true } },
+                  },
+                },
+              },
+            },
+          },
+          skip,
+          take: limit,
+          orderBy: { id: "asc" },
+        }),
+      ]);
+
+      const formattedData = clos.map((c) => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        name_th: c.name_th,
+        course_id: c.course.id,
+        course_code: c.course.code,
+        programs: Array.from(
+          new Set(
+            c.course.semesters.flatMap((s) =>
+              s.programOnCourses.map((p) => p.program.program_code),
+            ),
+          ),
+        ),
+      }));
+
+      res.json({
+        data: formattedData,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (err) {
+      console.error("Pagination Error:", err);
+      res.status(500).json({ error: "Failed to fetch paginated CLOs" });
+    }
+  },
+);
+
+// =========================================
+// 2. GET / (Simple List)
+// =========================================
+router.get("/", authenticateToken, async (req: Request, res: Response) => {
+  const courseId = parseIntSafe(req.query.courseId);
   try {
-    // 1. Destructure and Normalize Query Params
-    const {
-      universityId,
-      facultyId,
-      programId,
-      year,
-      semester,
-      section,
-      courseId,
-    } = req.query;
-
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 10;
-    const offset = (page - 1) * limit;
-
-    // 2. Build the WHERE clause dynamically (ONCE)
-    // We use an array for values to prevent SQL injection ($1, $2, etc.)
-    const params: any[] = [];
-    const conditions: string[] = ["1=1"]; // Start with 1=1 so we can always append "AND ..."
-
-    if (universityId) {
-      params.push(universityId);
-      conditions.push(`university.id = $${params.length}`);
-    }
-    if (facultyId) {
-      params.push(facultyId);
-      conditions.push(`faculty.id = $${params.length}`);
-    }
-    if (programId) {
-      params.push(programId);
-      conditions.push(`program.id = $${params.length}`);
-    }
-    if (year) {
-      params.push(year);
-      // ⚠️ CHECK THIS: usually frontend sends '2025' (Academic Year).
-      // If 'program.program_year' is '1' (Curriculum Year 1), this will fail.
-      // You likely want: `course.academic_year`
-      conditions.push(`program.program_year = $${params.length}`);
-    }
-    if (semester) {
-      params.push(semester);
-      conditions.push(`course.semester = $${params.length}`);
-    }
-    if (section) {
-      params.push(section);
-      conditions.push(`course.section = $${params.length}`);
-    }
-    if (courseId) {
-      params.push(courseId);
-      conditions.push(`course.id = $${params.length}`);
-    }
-
-    const whereClause = "WHERE " + conditions.join(" AND ");
-
-    // 3. Construct the Main Query (Data)
-    // Note: We use the same 'whereClause' and 'params'
-    const dataQuery = `
-      SELECT 
-        clo.id, clo.code, clo.name, clo.name_th, clo.course_id,
-        course.id AS course_real_id, 
-        program.id AS program_id
-      FROM clo
-      JOIN course ON clo.course_id = course.id
-      JOIN program ON course.program_id = program.id
-      JOIN faculty ON program.faculty_id = faculty.id
-      JOIN university ON faculty.university_id = university.id
-      ${whereClause}
-      ORDER BY clo.id ASC 
-      LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-    `;
-
-    // 4. Construct the Count Query (Total)
-    const countQuery = `
-      SELECT COUNT(*) AS total
-      FROM clo
-      JOIN course ON clo.course_id = course.id
-      JOIN program ON course.program_id = program.id
-      JOIN faculty ON program.faculty_id = faculty.id
-      JOIN university ON faculty.university_id = university.id
-      ${whereClause}
-    `;
-
-    // 5. Execute Queries
-    // We run them in parallel for better performance
-    const [result, countResult] = await Promise.all([
-      pool.query(dataQuery, [...params, limit, offset]), // Add limit/offset to params
-      pool.query(countQuery, params), // Use base params
-    ]);
-
-    // 6. Return Response
-    const total = parseInt(countResult.rows[0].total, 10);
-
-    res.json({
-      data: result.rows,
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit), // Handy for frontend
+    const clos = await prisma.clo.findMany({
+      where: { course_id: courseId || undefined },
+      orderBy: { id: "asc" },
     });
-  } catch (err: any) {
-    console.error("Pagination Error:", err.message);
-    res.status(500).json({ error: "Failed to fetch paginated CLOs" });
-  }
-});
-
-// =========================================
-// 2. GET / (Simple List / Dropdown)
-// =========================================
-router.get("/", authenticateToken, async (req, res) => {
-  try {
-    const courseId = req.query.courseId as string | undefined;
-
-    const result = await pool.query(
-      `SELECT id, code, name, name_th, course_id FROM clo
-       ${courseId ? "WHERE course_id = $1" : ""}
-       ORDER BY id ASC`,
-      courseId ? [courseId] : []
-    );
-
-    res.json(result.rows);
+    res.json(clos);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Unable to retrieve clo information" });
+    res.status(500).json({ error: "Unable to retrieve CLO information" });
   }
 });
 
 // =========================================
-// 3. POST / (Add CLO)
+// 3. POST / (Add Single CLO)
 // =========================================
-router.post("/", authenticateToken, async (req, res) => {
+router.post("/", authenticateToken, async (req: Request, res: Response) => {
   const { code, name, name_th, course_id } = req.body;
 
   try {
-    // 1. Insert the CLO
-    // We let the database handle the unique check now (via the new constraint)
-    const result = await pool.query(
-      `INSERT INTO clo (code, name, name_th, course_id) 
-       VALUES ($1, $2, $3, $4) 
-       RETURNING id, code, name, name_th, course_id`,
-      [code, name, name_th, course_id]
-    );
-    res.status(201).json(result.rows[0]);
-  } catch (err: any) {
-    // 2. Handle the specific error if the database complains
-    if (err.code === "23505") {
-      // Postgres code for Unique Violation
+    const newClo = await prisma.clo.create({
+      data: {
+        code,
+        name,
+        name_th: name_th || name,
+        course_id: Number(course_id),
+      },
+    });
+    res.status(201).json(newClo);
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
       return res
         .status(409)
         .json({ error: "This CLO code already exists in this course" });
     }
-
-    console.error("Database Error:", err.message);
     res.status(500).json({ error: "Unable to add CLO" });
   }
 });
 
-router.post("/bulk", authenticateToken, async (req, res) => {
-  const { clos } = req.body; // Expecting an array of CLOs
+// =========================================
+// 4. POST /bulk (Upload Many)
+// =========================================
+router.post("/bulk", authenticateToken, async (req: Request, res: Response) => {
+  const { clos } = req.body;
 
   if (!Array.isArray(clos) || clos.length === 0) {
-    return res.status(400).json({ error: "No CLOs provided for bulk upload" });
+    return res.status(400).json({ error: "No CLOs provided" });
   }
 
   try {
-    // We can use a transaction to ensure all-or-nothing
-    await pool.query("BEGIN");
+    // กรองข้อมูลให้เป็น Number ก่อนส่งเข้า createMany
+    const data = clos.map((clo) => ({
+      code: clo.code,
+      name: clo.name,
+      name_th: clo.name_th || clo.name,
+      course_id: Number(clo.course_id),
+    }));
 
-    for (const clo of clos) {
-      const { code, name, name_th, course_id } = clo;
+    const result = await prisma.clo.createMany({
+      data,
+      skipDuplicates: true, // ข้ามถ้ามีรหัสซ้ำในคอร์สเดียวกัน
+    });
 
-      try {
-        await pool.query(
-          `INSERT INTO clo (code, name, name_th, course_id) 
-           VALUES ($1, $2, $3, $4)`,
-          [code, name, name_th, course_id]
-        );
-      } catch (err: any) {
-        if (err.code === "23505") {
-          // If there's a duplicate code for the same course, we skip it
-          continue;
-        } else {
-          throw err; // For any other error, we want to rollback
-        }
-      }
-    }
-
-    await pool.query("COMMIT");
-    res.status(201).json({ message: "Bulk CLO upload completed" });
+    res
+      .status(201)
+      .json({ message: "Bulk upload successful", count: result.count });
   } catch (err) {
-    await pool.query("ROLLBACK");
-    console.error("Bulk Upload Error:", err);
     res.status(500).json({ error: "Bulk upload failed" });
   }
 });
 
-router.delete("/bulk-delete", authenticateToken, async (req, res) => {
-  const { cloIds } = req.body; // Expecting [1, 2, 3]
-
-  if (!Array.isArray(cloIds) || cloIds.length === 0) {
-    return res.status(400).json({ error: "No CLO IDs provided" });
-  }
-
-  try {
-    await pool.query("BEGIN");
-    
-    await pool.query(
-      "DELETE FROM clo WHERE id = ANY($1::int[])",
-      [cloIds]
-    );
-
-    await pool.query("COMMIT");
-    res.status(200).json({ message: "Bulk delete successful" });
-  } catch (err) {
-    await pool.query("ROLLBACK");
-    res.status(500).json({ error: "Failed to delete CLOs" });
-  }
-});
-
-router.delete("/:id", authenticateToken, async (req, res) => {
-  const cloId = parseInt(req.params.id as string);
-
-  try {
-    const result = await pool.query(`DELETE FROM clo WHERE id = $1`, [cloId]);
-
-    if (result.rowCount === 0) {
-      return res.status(404).json({ error: "CLO not found" });
-    }
-
-    res.status(204).send();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Unable to delete CLO" });
-  }
-});
-
-router.patch("/:id", authenticateToken, async (req, res) => {
-  const cloId = parseInt(req.params.id as string);
+// =========================================
+// 5. PATCH /:id (Update)
+// =========================================
+router.patch("/:id", authenticateToken, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id as string);
   const { code, name, name_th } = req.body;
 
   try {
-    const result = await pool.query(
-      `UPDATE clo 
-       SET code = $1, name = $2, name_th = $3
-       WHERE id = $4
-       RETURNING id, code, name, name_th, course_id`,
-      [code, name, name_th, cloId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "CLO not found" });
-    }
-
-    res.json(result.rows[0]);
-  } catch (err: any) {
-    if (err.code === "23505") {
+    const updated = await prisma.clo.update({
+      where: { id },
+      data: { code, name, name_th },
+    });
+    res.json(updated);
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
       return res
         .status(409)
         .json({ error: "This CLO code already exists in this course" });
     }
-
-    console.error(err);
-    res.status(500).json({ error: "Unable to update CLO" });
+    res.status(404).json({ error: "CLO not found" });
   }
 });
+
+// =========================================
+// 6. DELETE /bulk-delete
+// =========================================
+router.delete(
+  "/bulk-delete",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    const { cloIds } = req.body;
+
+    if (!Array.isArray(cloIds))
+      return res.status(400).json({ error: "Invalid IDs" });
+
+    try {
+      const deleted = await prisma.clo.deleteMany({
+        where: { id: { in: cloIds.map((id) => Number(id)) } },
+      });
+      res.json({ message: "Bulk delete successful", count: deleted.count });
+    } catch (err) {
+      res.status(500).json({ error: "Bulk delete failed" });
+    }
+  },
+);
+
+// =========================================
+// 7. DELETE /:id
+// =========================================
+router.delete(
+  "/:id",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id as string);
+    try {
+      await prisma.clo.delete({ where: { id } });
+      res.status(204).send();
+    } catch (err) {
+      res.status(404).json({ error: "CLO not found" });
+    }
+  },
+);
 
 export default router;

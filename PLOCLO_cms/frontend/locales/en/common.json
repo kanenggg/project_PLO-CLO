@@ -230,5 +230,21 @@
   "averageScore": "Average",
   "medianScore": "Median",
   "assessment": "Assessment",
-  "assessment-category-weights": "Assessment Category Weights"
+  "assessment-category-weights": "Assessment Category Weights",
+  "Delete This Section": "Delete This Section",
+  "Semester / Year": "Semester / Year",
+  "Section Group": "Section Group",
+  "Settings": "Settings",
+  "Scores & Grading": "Scores & Grading",
+  "Grade Cutoff": "Grade Cutoff",
+  "Configure minimum score for each grade": "Configure minimum score for each grade",
+  "Clear All": "Clear All",
+  "Save Settings": "Save Settings",
+  "Grade Symbol": "Grade Symbol",
+  "Min Score Requirement": "Min Score Requirement",
+  "Below": "Below",
+  "Warning: Ensure scores are in descending order (A > B+ > B ...). Students who do not meet the D requirement will automatically receive an F": "Warning: Ensure scores are in descending order (A > B+ > B ...). Students who do not meet the D requirement will automatically receive an F",
+  "core": "Core",
+  "elective": "Elective"
+  
 }

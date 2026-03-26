@@ -30,9 +30,9 @@ interface Assignment {
 
 export default function AssignmentCloMapping({
   courseId,
-  sectionId,
+  semesterId,
 }: {
-  sectionId: string | number;
+  semesterId: string | number;
   courseId: string | number;
 }) {
   const { token } = useAuth();
@@ -51,19 +51,19 @@ export default function AssignmentCloMapping({
 
   // 1. Fetch Initial Data
   useEffect(() => {
-    if (!sectionId || !token) return;
+    if (!semesterId || !token) return;
 
     const fetchData = async () => {
       setLoading(true);
       try {
         const [assignRes, cloRes, mapRes] = await Promise.all([
-          apiClient.get(`/assignment?sectionId=${sectionId}`, {
+          apiClient.get(`/assignment?semesterId=${semesterId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           apiClient.get(`/clo?courseId=${courseId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          apiClient.get(`/mapping/assignment-clo/${sectionId}`, {
+          apiClient.get(`/mapping/assignment-clo/${semesterId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -97,7 +97,7 @@ export default function AssignmentCloMapping({
     };
 
     fetchData();
-  }, [sectionId, token]);
+  }, [semesterId, token]);
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -327,7 +327,6 @@ export default function AssignmentCloMapping({
 
   return (
     <div className="flex flex-col gap-6">
-
       {/* Weight Breakdown Summary */}
       {weightSummary.length > 0 && (
         <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">

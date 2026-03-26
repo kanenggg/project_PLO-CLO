@@ -1,226 +1,170 @@
 import { Router } from "express";
-import { pool } from "../db";
 import { authenticateToken } from "../middleware/authMiddleware";
 import { PrismaClient } from "@prisma/client";
 
 const router = Router();
 const prisma = new PrismaClient();
 
-// --- GET: Fetch students ---
-// 1. If sectionId is provided: Fetch students in THAT specific section (for table display)
-// 2. If courseId is provided: Fetch students in ANY section of that course (for filtering popup)
+/**
+ * GET /: ดึงรายชื่อนักศึกษาตามเงื่อนไข
+ * 1. courseId: ดึงทุกคนในวิชานี้ (ทุก Section ใน Semester เดียวกัน)
+ * 2. sectionId: ดึงเฉพาะคนใน Section นั้น
+ */
 router.get("/", authenticateToken, async (req, res) => {
   try {
-    const { sectionId, courseId } = req.query;
+    const { sectionId, semesterId } = req.query; // 🟢 เปลี่ยนจาก courseId เป็น semesterId
 
-    if (!sectionId && !courseId) {
+    if (!sectionId && !semesterId) {
       return res
         .status(400)
-        .json({ error: "Either sectionId or courseId is required" });
+        .json({ error: "Either sectionId or semesterId is required" });
     }
 
-    // CASE A: Fetch by Master Course ID (Used for filtering "Available Students")
-    // We want to find students enrolled in ANY section belonging to this courseId
-    if (courseId) {
-      const result = await pool.query(
-        `
-        SELECT DISTINCT
-          s.id,
-          s.student_code,
-          s.first_name,
-          s.last_name
-        FROM student_on_section sos
-        JOIN course_section cs ON sos.section_id = cs.id
-        JOIN student s ON sos.student_id = s.id
-        WHERE cs.course_id = $1
-        `,
-        [courseId],
-      );
-      return res.json(result.rows);
+    // CASE A: ค้นหานิสิตที่ลงทะเบียนใน Semester นี้แล้ว (ทุก Section ภายใต้ Semester เดียวกัน)
+    // ใช้สำหรับเช็ค Duplicate ในระดับเทอมก่อน Import Excel
+    if (semesterId) {
+      const students = await prisma.student.findMany({
+        where: {
+          sections: {
+            some: {
+              section: {
+                course_semester_id: Number(semesterId), // 🟢 กรองเฉพาะนิสิตในเทอมที่ระบุเท่านั้น
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          student_code: true,
+          first_name: true,
+          last_name: true,
+        },
+      });
+      return res.json(students);
     }
 
-    // CASE B: Fetch by Specific Section ID (Used for the main table)
+    // CASE B: ค้นหานิสิตเฉพาะใน Section ที่ระบุ
     if (sectionId) {
-      const result = await pool.query(
-        `
-        SELECT 
-          sos.student_id,
-          sos.section_id,
-          sos."assignedAt", 
-          c.name AS course_name,
-          c.code AS course_code,
-          cs.section,
-          cs.semester,
-          cs.year,
-          s.student_code,
-          s.first_name,
-          s.last_name
-        FROM student_on_section sos
-        JOIN course_section cs ON sos.section_id = cs.id
-        JOIN course c ON cs.course_id = c.id
-        JOIN student s ON sos.student_id = s.id
-        WHERE sos.section_id = $1
-        ORDER BY s.student_code ASC
-        `,
-        [sectionId],
+      const enrollments = await prisma.studentOnSection.findMany({
+        where: { section_id: Number(sectionId) },
+        include: {
+          student: true,
+          section: {
+            include: {
+              semester_config: {
+                include: { course: true },
+              },
+            },
+          },
+        },
+        orderBy: {
+          student: { student_code: "asc" },
+        },
+      });
+
+      return res.json(
+        enrollments.map((e) => ({
+          student_id: e.student_id,
+          section_id: e.section_id,
+          assignedAt: e.assignedAt,
+          course_name: e.section.semester_config.course.name,
+          course_code: e.section.semester_config.course.code,
+          section: e.section.section,
+          semester: e.section.semester_config.semester,
+          year: e.section.semester_config.year,
+          student_code: e.student.student_code,
+          first_name: e.student.first_name,
+          last_name: e.student.last_name,
+        })),
       );
-      return res.json(result.rows);
     }
-  } catch (err: any) {
-    console.error("DATABASE ERROR:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to fetch records", details: err.message });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch student records" });
   }
 });
 
-router.get("/all", authenticateToken, async (_req, res) => {
-  try {
-    const result = await pool.query(
-      `
-      SELECT 
-        sos.student_id,
-        sos.section_id,
-        sos."assignedAt", 
-        c.name AS course_name,
-        c.code AS course_code,
-        cs.section,
-        cs.semester,
-        cs.year,
-        s.student_code,
-        s.first_name,
-        s.last_name
-      FROM student_on_section sos
-      JOIN course_section cs ON sos.section_id = cs.id
-      JOIN course c ON cs.course_id = c.id
-      JOIN student s ON sos.student_id = s.id
-      ORDER BY s.id ASC
-      `,
-    );
-
-    res.json(result.rows);
-  } catch (err: any) {
-    console.error("DATABASE ERROR:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to fetch records", details: err.message });
-  }
-});
-
-// --- POST: Bulk insert students into a section ---
+/**
+ * POST /bulk: เพิ่มนักศึกษาเข้ากลุ่มเรียนแบบกลุ่ม
+ */
 router.post("/bulk", authenticateToken, async (req, res) => {
   const { sectionId, studentIds } = req.body;
 
-  if (!sectionId)
-    return res.status(400).json({ error: "sectionId is required" });
-  if (!studentIds || !Array.isArray(studentIds)) {
-    return res.status(400).json({ error: "studentIds must be a valid list" });
-  }
-
-  try {
-    // 1. Get the course_code for the provided sectionId
-    const sectionInfo = await pool.query(
-      `SELECT c.code FROM course_section cs
-       JOIN course c ON cs.course_id = c.id
-       WHERE cs.id = $1`,
-      [sectionId],
-    );
-
-    if (sectionInfo.rowCount === 0) {
-      return res.status(404).json({ error: "Section not found" });
-    }
-
-    const courseCode = sectionInfo.rows[0].code;
-
-    // 2. Identify students already enrolled in ANY section of this course code
-    // (This prevents a student from being in Sec 1 AND Sec 2 of the same course)
-    const existingEnrollments = await pool.query(
-      `SELECT sos.student_id 
-       FROM student_on_section sos
-       JOIN course_section cs ON sos.section_id = cs.id
-       JOIN course c ON cs.course_id = c.id
-       WHERE c.code = $1 AND sos.student_id = ANY($2)`,
-      [courseCode, studentIds],
-    );
-
-    const alreadyEnrolledIds = existingEnrollments.rows.map(
-      (row) => row.student_id,
-    );
-
-    // 3. Filter the list to only include students NOT already in this course code
-    const studentsToAdd = studentIds.filter(
-      (id) => !alreadyEnrolledIds.includes(id),
-    );
-
-    if (studentsToAdd.length === 0) {
-      return res.status(400).json({
-        error:
-          "All selected students are already enrolled in a section of this course code.",
-      });
-    }
-
-    // 4. Perform the bulk insert for valid students
-    const queries = studentsToAdd.map((sId: number) =>
-      pool.query(
-        "INSERT INTO student_on_section (student_id, section_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-        [sId, sectionId],
-      ),
-    );
-
-    await Promise.all(queries);
-
-    res.json({
-      message: `Successfully assigned ${studentsToAdd.length} students.`,
-      skippedCount: alreadyEnrolledIds.length,
-    });
-  } catch (err: any) {
-    console.error("Bulk insert error:", err);
-    res
-      .status(500)
-      .json({ error: "Failed to assign students", details: err.message });
-  }
-});
-
-// --- DELETE: Remove a student from a section ---
-// Bulk Delete: Remove multiple students from a specific section
-router.delete("/bulk-delete", authenticateToken, async (req, res) => {
-  const { sectionId, studentIds } = req.body;
-
-  if (!sectionId || !Array.isArray(studentIds) || studentIds.length === 0) {
+  if (!sectionId || !Array.isArray(studentIds)) {
     return res.status(400).json({ error: "Invalid sectionId or studentIds" });
   }
 
   try {
-    // 🟢 ใช้ Transaction เพื่อความปลอดภัย: ลบคะแนนก่อน แล้วค่อยลบรายชื่อออกจาก Section
-    const result = await prisma.$transaction(async (tx) => {
-      // 1. ลบคะแนนทั้งหมดของนักศึกษาเหล่านี้ใน Section ที่กำหนด
-      await tx.studentScore.deleteMany({
-        where: {
-          student_id: { in: studentIds.map((id) => Number(id)) },
-          assignment: {
-            section_id: Number(sectionId), // หรือใช้เงื่อนไขที่เชื่อมโยงกับ Section ของคุณ
-          },
-        },
+    // 1. หาข้อมูล Semester ของ Section ปัจจุบัน
+    const sectionInfo = await prisma.courseSection.findUnique({
+      where: { id: Number(sectionId) },
+      select: { course_semester_id: true },
+    });
+
+    if (!sectionInfo)
+      return res.status(404).json({ error: "Section not found" });
+
+    // 2. ตรวจสอบนิสิตที่ลงทะเบียนในวิชานี้ (เทอมนี้) ไปแล้ว
+    const existing = await prisma.studentOnSection.findMany({
+      where: {
+        student_id: { in: studentIds.map((id) => Number(id)) },
+        section: { course_semester_id: sectionInfo.course_semester_id },
+      },
+      select: { student_id: true },
+    });
+
+    const alreadyEnrolledIds = existing.map((e) => e.student_id);
+    const studentsToAdd = studentIds
+      .map((id) => Number(id))
+      .filter((id) => !alreadyEnrolledIds.includes(id));
+
+    if (studentsToAdd.length === 0) {
+      return res.status(200).json({
+        message: "All students are already enrolled in this semester.",
+        skippedCount: alreadyEnrolledIds.length,
+        addedCount: 0,
       });
+    }
 
-      // 2. ลบนักศึกษาออกจากกลุ่มเรียน (Table: student_on_section)
-      const deleteResult = await tx.$executeRawUnsafe(
-        `DELETE FROM student_on_section 
-         WHERE section_id = $1 AND student_id = ANY($2::int[])`,
-        sectionId,
-        studentIds,
-      );
-
-      return deleteResult;
+    // 3. บันทึกข้อมูลแบบ Bulk
+    const created = await prisma.studentOnSection.createMany({
+      data: studentsToAdd.map((id) => ({
+        student_id: id,
+        section_id: Number(sectionId),
+      })),
+      skipDuplicates: true,
     });
 
     res.json({
-      message: `Successfully removed students and their associated scores`,
-      removedCount: result,
+      message: `Successfully assigned ${created.count} students.`,
+      skippedCount: alreadyEnrolledIds.length,
+      addedCount: created.count,
     });
   } catch (err) {
-    console.error("Error bulk deleting:", err);
-    res.status(500).json({ error: "Failed to delete records" });
+    res.status(500).json({ error: "Failed to assign students" });
+  }
+});
+
+router.delete("/bulk-delete", authenticateToken, async (req, res) => {
+  const { sectionId, studentIds } = req.body;
+
+  if (!sectionId || !Array.isArray(studentIds)) {
+    return res.status(400).json({ error: "Invalid sectionId or studentIds" });
+  }
+
+  try {
+    const deleted = await prisma.studentOnSection.deleteMany({
+      where: {
+        student_id: { in: studentIds.map((id) => Number(id)) },
+        section_id: Number(sectionId),
+      },
+    });
+
+    res.json({
+      message: `Successfully removed ${deleted.count} students from the section.`,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to remove students" });
   }
 });
 

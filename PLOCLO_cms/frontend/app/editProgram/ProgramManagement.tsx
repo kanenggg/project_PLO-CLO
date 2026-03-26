@@ -37,7 +37,6 @@ export default function ProgramManagement({
   universityId,
   facultyId,
   programId,
-  year,
   searchTerm = "",
 }: ProgramManagementProps) {
   const { t, i18n } = useTranslation("common");
@@ -59,9 +58,9 @@ export default function ProgramManagement({
   const [selectedFaculty, setSelectedFaculty] = useState("");
   const [selectedUniversity, setSelectedUniversity] = useState("");
   const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
-  const [programToDelete, setProgramToDelete] = useState<Program | null>(null);
+  // const [programToDelete, setProgramToDelete] = useState<Program | null>(null);
   const [showEditPopup, setShowEditPopup] = useState(false);
-  const [showDeletePopup, setShowDeletePopup] = useState(false);
+  // const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -150,7 +149,6 @@ export default function ProgramManagement({
         universityId,
         facultyId,
         programId,
-        year,
       });
 
       const programData = data.data || data;
@@ -181,7 +179,6 @@ export default function ProgramManagement({
     universityId,
     facultyId,
     programId,
-    year,
     t,
     showToast,
   ]);
@@ -423,7 +420,7 @@ export default function ProgramManagement({
   return (
     <div className="p-5 md:p-8">
       {loading && <LoadingOverlay />}
-     
+
       {/* HEADER & ACTIONS */}
       <div className="mb-6 flex justify-between items-center border-b pb-4">
         <h1 className="text-3xl font-light text-gray-800">
