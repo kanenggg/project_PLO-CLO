@@ -1,47 +1,67 @@
-name: workflow-tmas-scan
+name: docker-deploy
 
 on:
   push:
-      branches:
-          - main
-          
+    branches:
+      - main
+
 jobs:
-    TMAS-SCAN:
-        runs-on: ubuntu-latest
-        steps:
-            - name: CheckOut
-              uses: actions/checkout@v4
-              with:
-               submodules: false
+  deploy:
+    runs-on: self-hosted
 
-            - name: Sonarqube
-              uses: SonarSource/sonarqube-scan-action@v4
-              with:
-               projectBaseDir: PLOCLO_cms-main
-              env:
-                SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-                SONAR_TOKEN: ${{ secrets.SONAR_TOKEN}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            - name: Login To Docker
-              uses: docker/login-action@v3
-              with:
-                username: ${{ secrets.DOCKERHUB_USERNAME }}
-                password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Login Docker
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-            - name: Clean Docker
-              run: docker system prune -af
+      - name: Pull images
+        run: |
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
 
-            - name: Build Docker Images
-              run: |
-               docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest ./PLOCLO_cms-main/backend
-               docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest ./PLOCLO_cms-main/frontend
+      - name: Create network
+        run: docker network create myapp-net || true
 
-            - name: Push Docker Image
-              run: |
-               docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
-               docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+      - name: Stop old containers
+        run: |
+          docker stop postgres || true
+          docker rm postgres || true
+          docker stop backend || true
+          docker rm backend || true
+          docker stop frontend || true
+          docker rm frontend || true
 
-            # - name: Scan Backend Image
+      - name: Run postgres
+        run: |
+          docker run -d \
+            --name postgres \
+            --network myapp-net \
+            -e POSTGRES_PASSWORD=admin123 \
+            -e POSTGRES_DB=myapp \
+            postgres:15
+
+      - name: Run backend
+        run: |
+          docker run -d \
+            --name backend \
+            --network myapp-net \
+            -p 9771:9771 \
+            -e DATABASE_URL="postgresql://postgres:admin123@postgres:5432/myapp" \
+            -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+
+      - name: Run frontend
+        run: |
+          docker run -d \
+            --name frontend \
+            --network myapp-net \
+            -p 3000:3000 \
+            -e NEXT_PUBLIC_API_URL="http://104.197.255.217:9771/api" \
+            ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+  
+         # - name: Scan Backend Image
             #   uses: trendmicro/tmas-scan-action@v3.1.0
             #   with:
             #      version: 'latest'
@@ -64,49 +84,49 @@ jobs:
             #    githubToken: ${{ secrets.GITHUB_TOKEN }}
 
 
-    deploy:
-       runs-on: self-hosted
-       needs: TMAS-SCAN
-       steps:
+    # deploy:
+    #    runs-on: self-hosted
+    #    needs: TMAS-SCAN
+    #    steps:
 
-            - name: Checkout Code
-              uses: actions/checkout@v4
-              with:
-               submodules: true
+    #         - name: Checkout Code
+    #           uses: actions/checkout@v4
+    #           with:
+    #            submodules: true
 
-            - name: Check minikube Status
-              run: |
-               minikube status
-               kubectl cluster-info
+    #         - name: Check minikube Status
+    #           run: |
+    #            minikube status
+    #            kubectl cluster-info
 
-            - name: Clean Minikube Disk
-              run: |
-               minikube ssh -- docker system prune -af || true
+    #         - name: Clean Minikube Disk
+    #           run: |
+    #            minikube ssh -- docker system prune -af || true
 
-            - name: Pull images
-              run: |
-               docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
-               docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+    #         - name: Pull images
+    #           run: |
+    #            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+    #            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
-            - name: Apply manifests & Deploy to minikube
-              run: |
-               MINIKUBE_IP=$(minikube ip)
+    #         - name: Apply manifests & Deploy to minikube
+    #           run: |
+    #            MINIKUBE_IP=$(minikube ip)
 
-               sed -i "s|MINIKUBE_IP_PLACEHOLDER|http://${MINIKUBE_IP}:30000|g" \
-               PLOCLO_cms-main/k8s/frontend-deployment.yaml
+    #            sed -i "s|MINIKUBE_IP_PLACEHOLDER|http://${MINIKUBE_IP}:30000|g" \
+    #            PLOCLO_cms-main/k8s/frontend-deployment.yaml
 
-               kubectl apply -f PLOCLO_cms-main/k8s/postgres-deployment.yaml
-               kubectl apply -f PLOCLO_cms-main/k8s/backend-deployment.yaml
-               kubectl apply -f PLOCLO_cms-main/k8s/frontend-deployment.yaml
+    #            kubectl apply -f PLOCLO_cms-main/k8s/postgres-deployment.yaml
+    #            kubectl apply -f PLOCLO_cms-main/k8s/backend-deployment.yaml
+    #            kubectl apply -f PLOCLO_cms-main/k8s/frontend-deployment.yaml
 
-               kubectl set image deployment/frontend \
-               frontend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+    #            kubectl set image deployment/frontend \
+    #            frontend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
 
-               kubectl set image deployment/backend \
-               backend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+    #            kubectl set image deployment/backend \
+    #            backend=${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
-               kubectl rollout status deployment/frontend
-               kubectl rollout status deployment/backend
+    #            kubectl rollout status deployment/frontend
+    #            kubectl rollout status deployment/backend
           
 
             # - name: Download TMAS
