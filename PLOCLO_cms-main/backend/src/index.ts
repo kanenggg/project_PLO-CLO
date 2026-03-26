@@ -64,7 +64,7 @@ app.use("/api/instructorOnCourse", instructorOnCOurseRoutes);
 app.use("/api/reports", scoreCalculate);
 app.use("/api/programOnCourse", programOnCourseRoutes);
 
-app.listen(3001, async () => {
+app.listen(process.env.PORT || 3001, async () => {
   await seedAdminUser();
-  console.log("API on " + process.env.NEXT_PUBLIC_API_URL);
+  console.log("API on port " + (process.env.PORT || 3001));
 });
