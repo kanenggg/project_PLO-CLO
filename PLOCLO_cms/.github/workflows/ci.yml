@@ -1,22 +1,66 @@
-name: CI-sonarqube
+name: Docker Deployment
 
 on:
   push:
     branches:
-      - main
+      - kan-ploclo
 
 jobs:
-  Sonarqube-Scan:
-    runs-on: ubuntu-latest
+  Build:
+    runs-on: self-hosted
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v5
+      - name: Login to Docker
+        uses: docker/login-action@v3
         with:
-          projectBaseDir: .
-        env:
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Pull images
+        run: |
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+
+      - name: Create network
+        run: docker network create myapp-net || true
+        
+      - name: Stop old containers
+        run: |
+          docker stop postgres || true
+          docker rm postgres || true
+          docker stop backend || true
+          docker rm backend || true
+          docker stop frontend || true
+          docker rm frontend || true
+
+      - name: Run postgres
+        run: |
+          docker run -d \
+            --name postgres \
+            --network myapp-net \
+            -e POSTGRES_PASSWORD=admin123 \
+            -e POSTGRES_DB=myapp \
+            -v pgdata:/var/lib/postgresql/data \
+            postgres:15
+
+      - name: Run backend
+        run: |
+          docker run -d \
+            --name backend \
+            --network myapp-net \
+            -p 9771:9771 \
+            -e DATABASE_URL="postgresql://postgres:admin123@postgres:5432/myapp" \
+            -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+
+      - name: Run frontend
+        run: |
+          docker run -d \
+            --name frontend \
+            --network myapp-net \
+            -p 3000:3000 \
+            -e NEXT_PUBLIC_API_URL="http://104.197.255.217:9771/api" \
+            ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
