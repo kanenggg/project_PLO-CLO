@@ -55,24 +55,28 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           GOOGLE_CALLBACK_URL: ${{ secrets.GOOGLE_CALLBACK_URL }}
         run: |
-          python3 << 'EOF'
-          import os
-          vars = ['JWT_SECRET','DB_PASSWORD','DATABASE_URL','GOOGLE_CLIENT_ID','GOOGLE_CLIENT_SECRET','GOOGLE_CALLBACK_URL']
-          with open('/tmp/backend.env','w') as f:
-              for v in vars:
-                  f.write(f'{v}={os.environ[v]}\n')
-              f.write('DB_HOST=postgres\nDB_PORT=5432\nDB_USER=postgres\nDB_NAME=myapp\nNODE_ENV=development\n')
-          EOF
-          docker run -d \
-            --name backend \
-            --network myapp-net \
-            -p 3001:3001 \
-            --env-file /tmp/backend.env \
-            ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+           python3 -c "
+           import os
+           def clean(v):
+                return os.environ.get(v,'').strip('\"').strip(\"'\")
+                lines = [
+               'DB_HOST=postgres',
+               'DB_PORT=5432',
+               'DB_USER=postgres',
+               'DB_NAME=myapp',
+               'NODE_ENV=development',
+               'DB_PASSWORD=' + clean('DB_PASSWORD'),
+               'DATABASE_URL=' + clean('DATABASE_URL'),
+               'JWT_SECRET=' + clean('JWT_SECRET'),
+               'GOOGLE_CLIENT_ID=' + clean('GOOGLE_CLIENT_ID'),
+               'GOOGLE_CLIENT_SECRET=' + clean('GOOGLE_CLIENT_SECRET'),
+               'GOOGLE_CALLBACK_URL=' + clean('GOOGLE_CALLBACK_URL'),
+                ]
+                open('/tmp/backend.env','w').write('\n'.join(lines))"
 
       - name: Run frontend
         run: |
-          docker run -d \
+            docker run -d \
             --name frontend \
             --network myapp-net \
             -p 3000:3000 \
