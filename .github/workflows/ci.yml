@@ -48,12 +48,13 @@ jobs:
 
       - name: Run backend
         run: |
-          docker run -d \
-            --name backend \
-            --network myapp-net \
-            -p 9771:9771 \
-            --env-file project_PLO-CLO/PLOCLO_cms/.env \
-            ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+         echo "${{ secrets.ENV_FILE }}" > /tmp/backend.env
+         docker run -d \
+         --name backend \
+         --network myapp-net \
+         -p 9771:3001 \
+         --env-file /tmp/backend.env \
+         ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
       - name: Run frontend
         run: |
@@ -61,5 +62,5 @@ jobs:
             --name frontend \
             --network myapp-net \
             -p 3000:3000 \
-            -e NEXT_PUBLIC_API_URL="http://104.197.255.217:9771/api" \
+            -e NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL}}\
             ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
