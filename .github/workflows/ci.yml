@@ -41,27 +41,27 @@ jobs:
                docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
                docker push ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
 
-            - name: Scan Backend Image
-              uses: trendmicro/tmas-scan-action@v3.1.0
-              with:
-                 version: 'latest'
-                 vulnerabilitiesScan: true
-                 malwareScan: false
-                 artifact: registry:${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
-                 additionalArgs: --region=ap-southeast-1
-                 tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
-                 githubToken: ${{ secrets.GITHUB_TOKEN }}
+            # - name: Scan Backend Image
+            #   uses: trendmicro/tmas-scan-action@v3.1.0
+            #   with:
+            #      version: 'latest'
+            #      vulnerabilitiesScan: true
+            #      malwareScan: false
+            #      artifact: registry:${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+            #      additionalArgs: --region=ap-southeast-1
+            #      tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
+            #      githubToken: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Scan Frontend Image
-              uses: trendmicro/tmas-scan-action@v3.1.0
-              with:
-               version: 'latest'
-               vulnerabilitiesScan: true
-               malwareScan: false
-               artifact: registry:${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
-               additionalArgs: --region=ap-southeast-1
-               tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
-               githubToken: ${{ secrets.GITHUB_TOKEN }}
+            # - name: Scan Frontend Image
+            #   uses: trendmicro/tmas-scan-action@v3.1.0
+            #   with:
+            #    version: 'latest'
+            #    vulnerabilitiesScan: true
+            #    malwareScan: false
+            #    artifact: registry:${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-frontend:latest
+            #    additionalArgs: --region=ap-southeast-1
+            #    tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
+            #    githubToken: ${{ secrets.GITHUB_TOKEN }}
 
 
     deploy:
