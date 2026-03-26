@@ -48,13 +48,22 @@ jobs:
 
       - name: Run backend
         run: |
-         echo "${{ secrets.ENV_FILE }}" > /tmp/backend.env
-         docker run -d \
-         --name backend \
-         --network myapp-net \
-         -p 9771:3001 \
-         --env-file /tmp/backend.env \
-         ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
+          docker run -d \
+            --name backend \
+            --network myapp-net \
+            -p 9771:3001 \
+            -e DB_HOST=postgres \
+            -e DB_PORT=5432 \
+            -e DB_USER=postgres \
+            -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+            -e DB_NAME=myapp \
+            -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
+            -e GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }} \
+            -e GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }} \
+            -e GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }} \
+            -e NODE_ENV=development \
+            ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
       - name: Run frontend
         run: |
