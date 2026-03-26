@@ -52,8 +52,7 @@ jobs:
             --name backend \
             --network myapp-net \
             -p 9771:9771 \
-            -e DATABASE_URL="postgresql://postgres:admin123@postgres:5432/myapp" \
-            -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            --env-file project_PLO-CLO\PLOCLO_cms/.env \
             ${{ secrets.DOCKERHUB_USERNAME }}/ploclo_cms-main-backend:latest
 
       - name: Run frontend
