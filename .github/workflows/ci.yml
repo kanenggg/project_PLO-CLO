@@ -33,7 +33,26 @@ jobs:
          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO_cms/frontend
          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
 
+      - name: Create .env file
+        working-directory: ./PLOCLO_cms
+        run: |
+         cat > .env << EOF
+         DB_HOST=${{ secrets.DB_HOST }}
+         DB_PORT=${{ secrets.DB_PORT }}
+         DB_USER=${{ secrets.DB_USER }}
+         DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+         DB_NAME=${{ secrets.DB_NAME }}
+         JWT_SECRET=${{ secrets.JWT_SECRET }}
+         DATABASE_URL=${{ secrets.DATABASE_URL }}
+         GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+         GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+         GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }}
+         NODE_ENV=${{ secrets.NODE_ENV }}
+         NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}
+         EOF
+
       - name: Deploy with docker compose
+        working-directory: ./PLOCLO_cms
         run: |
          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
