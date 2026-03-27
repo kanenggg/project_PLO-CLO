@@ -37,7 +37,7 @@ services:
       postgres:
         condition: service_healthy
     env_file:
-      - ./.env
+      - ./PLOCLO_cms/.env
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -59,7 +59,7 @@ services:
       - NODE_ENV=development
     command: npm run dev
     env_file:
-      - ./.env
+      - ./PLOCLO_cms/.env
 
 volumes:
   pgdata:
