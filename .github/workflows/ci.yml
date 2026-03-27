@@ -1,4 +1,4 @@
-name: Docker Deployment
+name: K8s Deployment
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       - kan-ploclo
 
 jobs:
-  Build:
-    runs-on: self-hosted
+  CI-git:
+    runs-on: ubuntu:latest
 
     steps:
       - name: Checkout
@@ -23,6 +23,11 @@ jobs:
         run: |
          docker image prune -a -f
 
+  CD-Deploy:
+     needs: CI-git
+     runs-on: self-hosted
+     
+     steps:
       - name: Build and Push Backend
         run: |
          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./PLOCLO_cms/backend
@@ -33,27 +38,81 @@ jobs:
          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO_cms/frontend
          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
 
-      - name: Create .env file
-        working-directory: ./PLOCLO_cms
+      - name: Deploy to K8s
         run: |
-         echo "DB_HOST=${{ secrets.DB_HOST }}" > .env
-         echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
-         echo "DB_USER=${{ secrets.DB_USER }}" >> .env
-         echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
-         echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
-         echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-         echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
-         echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
-         echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> .env
-         echo "GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }}" >> .env
-         echo "NODE_ENV=${{ secrets.NODE_ENV }}" >> .env
-         echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" >> .env
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/secret.yaml
+          kubectl apply -f k8s/postgres/
+          kubectl apply -f k8s/backend/
+          kubectl apply -f k8s/frontend/
 
-      - name: Deploy with docker compose
-        working-directory: ./PLOCLO_cms
+      - name: Rollout restart (pull latest image)
         run: |
-         docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
-         docker pull ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
-         docker compose up -d --build
+          kubectl rollout restart deployment/backend -n ploclo
+          kubectl rollout restart deployment/frontend -n ploclo
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/backend -n ploclo --timeout=120s
+          kubectl rollout status deployment/frontend -n ploclo --timeout=120s
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      # - name: Create .env file
+      #   working-directory: ./PLOCLO_cms
+      #   run: |
+      #    echo "DB_HOST=${{ secrets.DB_HOST }}" > .env
+      #    echo "DB_PORT=${{ secrets.DB_PORT }}" >> .env
+      #    echo "DB_USER=${{ secrets.DB_USER }}" >> .env
+      #    echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+      #    echo "DB_NAME=${{ secrets.DB_NAME }}" >> .env
+      #    echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+      #    echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> .env
+      #    echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}" >> .env
+      #    echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}" >> .env
+      #    echo "GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }}" >> .env
+      #    echo "NODE_ENV=${{ secrets.NODE_ENV }}" >> .env
+      #    echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" >> .env
+
+      # - name: Deploy with docker compose
+      #   working-directory: ./PLOCLO_cms
+      #   run: |
+      #    docker pull ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+      #    docker pull ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
+      #    docker compose up -d --build
 
       

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: ploclo
+spec:
+  replicas: 2           # รัน 2 instance พร้อมกัน
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: kansumware/backend:latest
+          envFrom:
+            - secretRef:
+                name: ploclo-secret
+          ports:
+            - containerPort: 3001
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 5
