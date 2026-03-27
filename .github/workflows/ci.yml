@@ -28,6 +28,10 @@ jobs:
      runs-on: self-hosted
 
      steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - name: Build and Push Backend
         run: |
          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./PLOCLO_cms/backend
