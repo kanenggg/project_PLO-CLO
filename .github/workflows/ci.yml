@@ -7,7 +7,7 @@ on:
 
 jobs:
   CI-git:
-    runs-on: ubuntu:latest
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -26,7 +26,7 @@ jobs:
   CD-Deploy:
      needs: CI-git
      runs-on: self-hosted
-     
+
      steps:
       - name: Build and Push Backend
         run: |
