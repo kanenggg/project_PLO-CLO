@@ -44,11 +44,11 @@ jobs:
 
       - name: Deploy to K8s
         run: |
-          kubectl apply -f ./PLOCLO_cmsk8s/namespace.yaml
-          kubectl apply -f ./PLOCLO_cmsk8s/k8s/secret.yaml
-          kubectl apply -f ./PLOCLO_cmsk8s/k8s/postgres/
-          kubectl apply -f ./PLOCLO_cmsk8s/k8s/backend/
-          kubectl apply -f ./PLOCLO_cmsk8s/k8s/frontend/
+          kubectl apply -f ./PLOCLO_cms/k8s/namespace.yaml
+          kubectl apply -f ./PLOCLO_cms/k8s/k8s/secret.yaml
+          kubectl apply -f ./PLOCLO_cms/k8s/k8s/postgres/
+          kubectl apply -f ./PLOCLO_cms/k8s/k8s/backend/
+          kubectl apply -f ./PLOCLO_cms/k8s/k8s/frontend/
 
       - name: Rollout restart (pull latest image)
         run: |
