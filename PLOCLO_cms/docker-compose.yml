@@ -50,9 +50,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: frontend
-    volumes:
-      - ./frontend:/app
-      - /app/.next
+    # volumes:
+    #   - ./frontend:/app
+    #   - /app/.next
     ports:
       - "9770:3000"
     environment:
