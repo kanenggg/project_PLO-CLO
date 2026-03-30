@@ -17,6 +17,7 @@ RUN npx prisma generate
 
 COPY . .
 
+RUN chmod +x wait-for-db.sh
 RUN npm run build
 
 EXPOSE 3001
