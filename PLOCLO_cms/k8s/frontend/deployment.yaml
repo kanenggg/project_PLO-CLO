@@ -21,3 +21,5 @@ spec:
                 name: ploclo-secret
           ports:
             - containerPort: 3000
+              targetPort: 3000
+              nodePort: 30000
