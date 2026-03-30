@@ -34,12 +34,12 @@ jobs:
 
       - name: Build and Push Backend
         run: |
-         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./PLOCLO_cms/backend
+         docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./PLOCLO_cms/backend
          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
 
       - name: Build and Push Frontend
         run: |
-         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO_cms/frontend
+         docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO_cms/frontend
          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
 
       - name: Deploy to K8s
@@ -61,6 +61,10 @@ jobs:
           kubectl rollout status deployment/backend -n ploclo --timeout=120s
           kubectl rollout status deployment/frontend -n ploclo --timeout=120s
 
+      - name: Forward Port for Kubernetes
+        run: |
+         sudo -E kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 80:80 --address 0.0.0.0 &
+         kubectl port-forward service/backend 8000:3001 -n ploclo --address 0.0.0.0
 
 
 

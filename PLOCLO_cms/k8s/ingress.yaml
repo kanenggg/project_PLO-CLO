@@ -3,8 +3,6 @@ kind: Ingress
 metadata:
   name: ploclo-ingress
   namespace: ploclo
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   rules:
   - http:
