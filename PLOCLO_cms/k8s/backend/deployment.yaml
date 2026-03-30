@@ -4,7 +4,7 @@ metadata:
   name: backend
   namespace: ploclo
 spec:
-  replicas: 2           # รัน 2 instance พร้อมกัน
+  replicas: 2
   selector:
     matchLabels:
       app: backend
@@ -16,6 +16,7 @@ spec:
       containers:
         - name: backend
           image: kansumware/backend:latest
+          command: ["sh", "-c", "until nc -z postgres 5432; do echo Waiting...; sleep 2; done && echo Postgres ready! && npx prisma db push && node dist/index.js"]
           envFrom:
             - secretRef:
                 name: ploclo-secret
