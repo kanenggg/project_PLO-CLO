@@ -53,6 +53,7 @@ jobs:
         run: |
           kubectl rollout restart deployment/backend -n ploclo
           kubectl rollout restart deployment/frontend -n ploclo
+          
 
       - name: Wait for rollout
         run: |
