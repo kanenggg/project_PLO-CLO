@@ -21,3 +21,8 @@ spec:
                 name: ploclo-secret
           ports:
             - containerPort: 3001
+          httpGet:
+              path: /api/health
+              port: 3001
+              initialDelaySeconds: 10
+              periodSeconds: 5
