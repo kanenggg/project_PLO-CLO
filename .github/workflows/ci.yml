@@ -39,7 +39,7 @@ jobs:
 
       - name: Build and Push Frontend
         run: |
-         docker build ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO_cms/frontend
+         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO_cms/frontend
          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
 
       - name: Deploy to K8s
