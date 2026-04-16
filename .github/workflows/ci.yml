@@ -22,25 +22,35 @@ jobs:
         run: |
          docker image prune -a -f
 
-  CD-Deploy:
-     needs: CI-git
-     runs-on: self-hosted
-
-     steps:
-
+  Build-Backend:
+    needs: CI-git
+    runs-on: self-hosted
+    steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Build and Push Backend
         run: |
-         docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./PLOCLO_cms/backend
-         docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
+          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./PLOCLO_cms/backend
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
+
+  Build-Frontend:
+    needs: CI-git
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Build and Push Frontend
         run: |
-         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO_cms/frontend
-         docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO_cms/frontend
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
 
+  CD-Deploy:
+     needs: [Build-Backend, Build-Frontend]
+     runs-on: self-hosted
+
+     steps:
       - name: Deploy to K8s
         run: |
           kubectl apply -f ./PLOCLO_cms/k8s/namespace.yaml
@@ -60,6 +70,28 @@ jobs:
           kubectl rollout status deployment/backend -n ploclo --timeout=120s
           kubectl rollout status deployment/frontend -n ploclo --timeout=120s
 
+  Robot-Test:
+    needs: CD-Deploy
+    runs-on: self-hosted
+    steps:
+       - name: Checkout
+         uses: actions/checkuot@v4
+
+       - name: Set up Python
+         uses: actions/setup-python@v4
+         with:
+          python-version: '3.11'
+
+       - name: Install dependencies
+         run: |
+          robot --outpudir results PLOCLO_cms/Robot-framework/venv/login_test
+
+       - name: Upload Test Results
+         uses: actions/upload-artifact@4
+         if: always()
+         with:
+          name: robot-results
+          path: results/
 
       # - name: Create .env file
       #   working-directory: ./PLOCLO_cms
