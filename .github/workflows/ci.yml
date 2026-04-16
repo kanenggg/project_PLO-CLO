@@ -88,7 +88,17 @@ jobs:
          with:
           python-version: '3.11'
 
-       - name: Install dependencies
+       - name: Install Robot Framework
+         run: |
+          pip install robotframework
+          pip install robotframework-seleniumlibrary
+
+       - name: Install Chrome & ChromeDriver
+         run: |
+          sudo apt-get update
+          sudo apt-get install -y chromium-browser chromium-chromedriver
+
+       - name: Run Robot Framework Tests
          run: |
           robot --outpudir results PLOCLO_cms/Robot-framework/venv/login_test
 
