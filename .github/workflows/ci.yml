@@ -24,7 +24,7 @@ jobs:
 
   Build-Backend:
     needs: CI-git
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
 
   Build-Frontend:
     needs: CI-git
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -74,8 +74,8 @@ jobs:
     needs: CD-Deploy
     runs-on: self-hosted
     steps:
-       - name: Checkout
-         uses: actions/checkuot@v4
+       - name: Checkout code
+         uses: actions/checkout@v4
 
        - name: Set up Python
          uses: actions/setup-python@v4
