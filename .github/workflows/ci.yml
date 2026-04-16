@@ -95,7 +95,7 @@ jobs:
 
        - name: Run Robot Framework Tests
          run: |
-          robot --outpudir results PLOCLO_cms/Robot-framework/venv/login_test
+          robot --outputdir results PLOCLO_cms/Robot-framework/venv/login_test
 
        - name: Upload Test Results
          uses: actions/upload-artifact@v4 
