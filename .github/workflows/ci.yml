@@ -84,48 +84,29 @@ jobs:
         tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
         githubToken: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: CVE Severity Gate (Critical / High)
-      if: always()
+    - name: Check TMAS Result and Block if Unsafe
       run: |
-          echo "===== Backend Vulnerabilities ====="
-          echo "Critical : ${{ steps.scan-backend.outputs.vulnerabilities-count-critical }}"
-          echo "High     : ${{ steps.scan-backend.outputs.vulnerabilities-count-high }}"
+          echo "=== Vulnerabilities structure ==="
+          cat tmas_scan_report.json | jq '.vulnerabilities'
+        
+          echo "=== Raw JSON keys ==="
+          cat tmas_scan_report.json | jq 'keys'
 
-          echo "===== Frontend Vulnerabilities ====="
-          echo "Critical : ${{ steps.scan-frontend.outputs.vulnerabilities-count-critical }}"
-          echo "High     : ${{ steps.scan-frontend.outputs.vulnerabilities-count-high }}"
+          CRITICAL=$(cat tmas_scan_report.json | jq '.vulnerabilities.criticalCount // 0')
+          HIGH=$(cat tmas_scan_report.json | jq '.vulnerabilities.highCount // 0')
+          MEDIUM=$(cat tmas_scan_report.json | jq '.vulnerabilities.mediumCount // 0')
 
-          # || 0 ป้องกัน crash ถ้า output เป็น empty string
-          BACKEND_CRITICAL=${{ steps.scan-backend.outputs.vulnerabilities-count-critical || 0 }}
-          BACKEND_HIGH=${{ steps.scan-backend.outputs.vulnerabilities-count-high || 0 }}
-          FRONTEND_CRITICAL=${{ steps.scan-frontend.outputs.vulnerabilities-count-critical || 0 }}
-          FRONTEND_HIGH=${{ steps.scan-frontend.outputs.vulnerabilities-count-high || 0 }}
-
-          FAILED=0
-
-          if [ "$BACKEND_CRITICAL" -gt 0 ]; then
-            echo "::error::Backend มี Critical CVE จำนวน $BACKEND_CRITICAL รายการ"
-            FAILED=1
+          # TMAS action v3 เก็บผลใน environment variable แทน
+          echo "=== TMAS Scan Output ==="
+          # ${{ steps.tmas.outcome }} คือการถามว่า step ชื่อ "tmas" ผลเป็นยังไง
+          echo "Exit code from TMAS: ${{ steps.tmas.outcome }}"
+    
+          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ] || [ "$MEDIUM" -gt 0 ]; then
+            echo "Found vulnerabilities! Blocking pipeline."
+          exit 1
           fi
-          if [ "$BACKEND_HIGH" -gt 0 ]; then
-            echo "::error::Backend มี High CVE จำนวน $BACKEND_HIGH รายการ"
-            FAILED=1
-          fi
-          if [ "$FRONTEND_CRITICAL" -gt 0 ]; then
-            echo "::error::Frontend มี Critical CVE จำนวน $FRONTEND_CRITICAL รายการ"
-            FAILED=1
-          fi
-          if [ "$FRONTEND_HIGH" -gt 0 ]; then
-            echo "::error::Frontend มี High CVE จำนวน $FRONTEND_HIGH รายการ"
-            FAILED=1
-          fi
-
-          if [ "$FAILED" -eq 1 ]; then
-            echo "Pipeline blocked: พบ Critical/High CVE ต้องแก้ไขก่อน deploy"
-            exit 1
-          fi
-
-          echo  "CVE Gate passed — ไม่พบ Critical/High CVE"
+    
+            echo "TMAS scan passed."
 
   CD-Deploy:
      needs: TMAS
