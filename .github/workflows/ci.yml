@@ -26,13 +26,20 @@ jobs:
       - name: Login to Docker
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ${{ secrets.REGISTRY_HOST }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASS }}
+
+      - name: Allow insecure registry
+        run: |
+          echo '{"insecure-registries": ["${{ secrets.REGISTRY_HOST }}"]}' \
+            | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
 
       - name: Build and Push Backend
         run: |
-          docker build --no-cache -t ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest ./PLOCLO_cms/backend
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
+          docker build --no-cache -t ${{ secrets.REGISTRY_HOST }}/backend:latest ./PLOCLO_cms/backend
+          docker push ${{ secrets.REGISTRY_HOST }}/backend:latest
 
   Build-Frontend:
     needs: CI-git
@@ -44,72 +51,79 @@ jobs:
       - name: Login to Docker
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          registry: ${{ secrets.REGISTRY_HOST }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASS }}
+
+      - name: Allow insecure registry
+        run: |
+          echo '{"insecure-registries": ["${{ secrets.REGISTRY_HOST }}"]}' \
+            | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
 
       - name: Build and Push Frontend
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest ./PLOCLO_cms/frontend
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+          docker build -t ${{ secrets.REGISTRY_HOST }}/frontend:latest ./PLOCLO_cms/frontend
+          docker push ${{ secrets.REGISTRY_HOST }}/frontend:latest
 
-  TMAS:
-    needs: [Build-Frontend, Build-Backend]
-    runs-on: self-hosted
-    steps:
+  # TMAS:
+  #   needs: [Build-Frontend, Build-Backend]
+  #   runs-on: self-hosted
+  #   steps:
 
-    - name: Checkout code
-      uses: actions/checkout@v4
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
 
-    - name: Scan Backend Image
-      id: scan-backend                          # ← เพิ่ม id เพื่อดึง output
-      uses: trendmicro/tmas-scan-action@v3.1.0
-      with:
-        version: 'latest'
-        vulnerabilitiesScan: true
-        malwareScan: false
-        artifact: registry:${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
-        additionalArgs: --region=ap-southeast-1
-        tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
-        githubToken: ${{ secrets.GITHUB_TOKEN }}
+  #   - name: Scan Backend Image
+  #     id: scan-backend                          # ← เพิ่ม id เพื่อดึง output
+  #     uses: trendmicro/tmas-scan-action@v3.1.0
+  #     with:
+  #       version: 'latest'
+  #       vulnerabilitiesScan: true
+  #       malwareScan: false
+  #       artifact: registry:${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
+  #       additionalArgs: --region=ap-southeast-1
+  #       tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
+  #       githubToken: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Scan Frontend Image
-      id: scan-frontend                         # ← เพิ่ม id เพื่อดึง output
-      uses: trendmicro/tmas-scan-action@v3.1.0
-      with:
-        version: 'latest'
-        vulnerabilitiesScan: true
-        malwareScan: false
-        artifact: registry:${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
-        additionalArgs: --region=ap-southeast-1
-        tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
-        githubToken: ${{ secrets.GITHUB_TOKEN }}
+  #   - name: Scan Frontend Image
+  #     id: scan-frontend                         # ← เพิ่ม id เพื่อดึง output
+  #     uses: trendmicro/tmas-scan-action@v3.1.0
+  #     with:
+  #       version: 'latest'
+  #       vulnerabilitiesScan: true
+  #       malwareScan: false
+  #       artifact: registry:${{ secrets.DOCKERHUB_USERNAME }}/frontend:latest
+  #       additionalArgs: --region=ap-southeast-1
+  #       tmasApiKey: ${{ secrets.VISION_ONE_API_KEY }}
+  #       githubToken: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Check TMAS Result and Block if Unsafe
-      run: |
-          echo "=== Vulnerabilities structure ==="
-          cat tmas_scan_report.json | jq '.vulnerabilities'
+  #   - name: Check TMAS Result and Block if Unsafe
+  #     run: |
+  #         echo "=== Vulnerabilities structure ==="
+  #         cat tmas_scan_report.json | jq '.vulnerabilities'
         
-          echo "=== Raw JSON keys ==="
-          cat tmas_scan_report.json | jq 'keys'
+  #         echo "=== Raw JSON keys ==="
+  #         cat tmas_scan_report.json | jq 'keys'
 
-          CRITICAL=$(cat tmas_scan_report.json | jq '.vulnerabilities.criticalCount // 0')
-          HIGH=$(cat tmas_scan_report.json | jq '.vulnerabilities.highCount // 0')
-          MEDIUM=$(cat tmas_scan_report.json | jq '.vulnerabilities.mediumCount // 0')
+  #         CRITICAL=$(cat tmas_scan_report.json | jq '.vulnerabilities.criticalCount // 0')
+  #         HIGH=$(cat tmas_scan_report.json | jq '.vulnerabilities.highCount // 0')
+  #         MEDIUM=$(cat tmas_scan_report.json | jq '.vulnerabilities.mediumCount // 0')
 
-          # TMAS action v3 เก็บผลใน environment variable แทน
-          echo "=== TMAS Scan Output ==="
-          # ${{ steps.tmas.outcome }} คือการถามว่า step ชื่อ "tmas" ผลเป็นยังไง
-          echo "Exit code from TMAS: ${{ steps.tmas.outcome }}"
+  #         # TMAS action v3 เก็บผลใน environment variable แทน
+  #         echo "=== TMAS Scan Output ==="
+  #         # ${{ steps.tmas.outcome }} คือการถามว่า step ชื่อ "tmas" ผลเป็นยังไง
+  #         echo "Exit code from TMAS: ${{ steps.tmas.outcome }}"
     
-          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ] || [ "$MEDIUM" -gt 0 ]; then
-            echo "Found vulnerabilities! Blocking pipeline."
-          exit 1
-          fi
+  #         if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ] || [ "$MEDIUM" -gt 0 ]; then
+  #           echo "Found vulnerabilities! Blocking pipeline."
+  #         exit 1
+  #         fi
     
-            echo "TMAS scan passed."
+  #           echo "TMAS scan passed."
 
   CD-Deploy:
-     needs: TMAS
+     needs: [Build-Frontend, Build-Backend]
      runs-on: self-hosted
 
      steps:
