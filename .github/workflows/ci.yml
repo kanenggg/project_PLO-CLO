@@ -23,18 +23,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Allow insecure registry
+        run: |
+          echo '{"insecure-registries": ["${{ secrets.REGISTRY_HOST }}"]}' \
+            | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
+
       - name: Login to Docker
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.REGISTRY_HOST }}
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASS }}
-
-      - name: Allow insecure registry
-        run: |
-          echo '{"insecure-registries": ["${{ secrets.REGISTRY_HOST }}"]}' \
-            | sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
 
       - name: Build and Push Backend
         run: |
@@ -48,18 +48,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Allow insecure registry
+        run: |
+          echo '{"insecure-registries": ["${{ secrets.REGISTRY_HOST }}"]}' \
+            | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
+
       - name: Login to Docker
         uses: docker/login-action@v3
         with:
           registry: ${{ secrets.REGISTRY_HOST }}
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASS }}
-
-      - name: Allow insecure registry
-        run: |
-          echo '{"insecure-registries": ["${{ secrets.REGISTRY_HOST }}"]}' \
-            | sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
 
       - name: Build and Push Frontend
         run: |
