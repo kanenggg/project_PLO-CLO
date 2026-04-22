@@ -155,7 +155,7 @@ jobs:
 
       - name: Fail if CRITICAL, HIGH found
         run: |
-          if [ "${{ steps.count.outputs.total_critical }},"${{ steps.count.outputs.total_high }}" -gt "0" ]; then
+          if [ "${{ steps.count.outputs.total_critical }}" -gt "0","${{ steps.count.outputs.total_high }}" -gt "0" ]; then
             echo "❌ พบ CRITICAL ${{ steps.count.outputs.total_critical }} รายการ — หยุด pipeline"
             echo "❌ พบ HIGH ${{ steps.count.outputs.total_high }} รายการ — หยุด pipeline"
             exit 1
