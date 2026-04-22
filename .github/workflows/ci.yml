@@ -70,6 +70,10 @@ jobs:
     needs: [Build-Frontend, Build-Backend]
     runs-on: ubuntu-latest
     steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Configure insecure registry
         run: |
           echo '{"insecure-registries":["${{ secrets.REGISTRY_HOST }}"]}' \
@@ -151,15 +155,11 @@ jobs:
 
       - name: Fail if CRITICAL found
         run: |
-          if [ "${{ steps.count.outputs.total_critical }}" -gt "0" ]; then
+          if [ "${{ steps.count.outputs.total_critical }}" -gt "0","${{ steps.count.outputs.total_high }}" -gt "0" ]; then
             echo "❌ พบ CRITICAL ${{ steps.count.outputs.total_critical }} รายการ — หยุด pipeline"
+            echo "❌ พบ HIGH ${{ steps.count.outputs.total_high }} รายการ — หยุด pipeline"
             exit 1
           fi
-
-          if [ "${{ steps.count.outputs.total_high }}" -gt "0" ]; then
-            echo "⚠️ พบ HIGH ${{ steps.count.outputs.total_high }} รายการ — ตรวจสอบที่ Kibana"
-          fi
-
           echo "✅ ผ่าน — ไม่พบ CRITICAL"
 
 
