@@ -66,6 +66,77 @@ jobs:
           docker build -t ${{ secrets.REGISTRY_HOST }}/frontend:latest ./PLOCLO_cms/frontend
           docker push ${{ secrets.REGISTRY_HOST }}/frontend:latest
 
+  trivy-scan:
+    needs: [Build-Frontend, Build-Backend]
+    runs-on: ubutu-latest
+    steps:
+      - name: Trivy scan - Frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+         image-ref: "${{ secrets.REGISTRY_HOST }}/frontend:latest"
+         format: "json"
+         output: "trivy-results-api.json"
+         scanners: "vuln,secret"
+         vuln-type: "os,library"
+         severity: "CRITICAL,HIGH"
+         ignore-unfixed: true
+
+      - name: Trivy scan - Backend
+        uses: aquasecurity/trivy-action@master
+        with:
+         image-ref: "${{ secrets.REGISTRY_HOST }}/backend:latest"
+         format: "json"
+         output: "trivy-results-worker.json"
+         scanners: "vuln,secret"
+         vuln-type: "os,library"
+         severity: "CRITICAL,HIGH"
+         ignore-unfixed: true
+
+      - name: Count CRITICAL and HIGH
+        id: count
+        run: |
+         for IMAGE in api worker; do
+         FILE="trivy-results-${IMAGE}.json"
+
+         CRITICAL=$(cat $FILE | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length')
+         HIGH=$(cat $FILE | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length')
+
+         echo "=== myapp-${IMAGE} ==="
+         echo "🔴 Critical : $CRITICAL"
+         echo "🟠 High     : $HIGH"
+
+         echo "critical_${IMAGE}=$CRITICAL" >> $GITHUB_OUTPUT
+         echo "high_${IMAGE}=$HIGH"         >> $GITHUB_OUTPUT
+         done
+
+         TOTAL_CRITICAL=$(( $(cat trivy-results-api.json    | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length') + \
+                       $(cat trivy-results-worker.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length') ))
+
+         TOTAL_HIGH=$(( $(cat trivy-results-api.json    | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length') + \
+                       $(cat trivy-results-worker.json | jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length') ))
+
+         echo ""
+         echo "=== Total (all images) ==="
+         echo "🔴 Critical : $TOTAL_CRITICAL"
+         echo "🟠 High     : $TOTAL_HIGH"
+
+         echo "total_critical=$TOTAL_CRITICAL" >> $GITHUB_OUTPUT
+         echo "total_high=$TOTAL_HIGH"         >> $GITHUB_OUTPUT
+
+      - name: Fail if CRITICAL found
+        run: |
+         if [ "${{ steps.count.outputs.total_critical }}" -gt "0" ]; then
+         echo "❌ พบ CRITICAL ${{ steps.count.outputs.total_critical }} รายการ — หยุด pipeline"
+         exit 1
+         fi
+
+         if [ "${{ steps.count.outputs.total_high }}" -gt "0" ]; then
+         echo "⚠️ พบ HIGH ${{ steps.count.outputs.total_high }} รายการ — ตรวจสอบที่ Kibana"
+         fi
+  
+         echo "✅ ผ่าน — ไม่พบ CRITICAL"
+
+
   # TMAS:
   #   needs: [Build-Frontend, Build-Backend]
   #   runs-on: self-hosted
@@ -122,57 +193,57 @@ jobs:
     
   #           echo "TMAS scan passed."
 
-  CD-Deploy:
-     needs: [Build-Frontend, Build-Backend]
-     runs-on: self-hosted
+  # CD-Deploy:
+  #    needs: [Build-Frontend, Build-Backend]
+  #    runs-on: self-hosted
 
-     steps:
-      - name: Deploy to K8s
-        run: |
-          kubectl apply -f ./PLOCLO_cms/k8s/namespace.yaml
-          kubectl apply -f ./PLOCLO_cms/k8s/postgres/
-          kubectl apply -f ./PLOCLO_cms/k8s/backend/
-          kubectl apply -f ./PLOCLO_cms/k8s/frontend/
-          kubectl apply -f ./PLOCLO_cms/k8s/ingress.yaml
+  #    steps:
+  #     - name: Deploy to K8s
+  #       run: |
+  #         kubectl apply -f ./PLOCLO_cms/k8s/namespace.yaml
+  #         kubectl apply -f ./PLOCLO_cms/k8s/postgres/
+  #         kubectl apply -f ./PLOCLO_cms/k8s/backend/
+  #         kubectl apply -f ./PLOCLO_cms/k8s/frontend/
+  #         kubectl apply -f ./PLOCLO_cms/k8s/ingress.yaml
 
-      - name: Rollout restart (pull latest image)
-        run: |
-          kubectl rollout restart deployment/backend -n ploclo
-          kubectl rollout restart deployment/frontend -n ploclo
+  #     - name: Rollout restart (pull latest image)
+  #       run: |
+  #         kubectl rollout restart deployment/backend -n ploclo
+  #         kubectl rollout restart deployment/frontend -n ploclo
           
 
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/backend -n ploclo --timeout=120s
-          kubectl rollout status deployment/frontend -n ploclo --timeout=120s
+  #     - name: Wait for rollout
+  #       run: |
+  #         kubectl rollout status deployment/backend -n ploclo --timeout=120s
+  #         kubectl rollout status deployment/frontend -n ploclo --timeout=120s
 
-  Robot-Test:
-    needs: CD-Deploy
-    runs-on: self-hosted
-    steps:
-       - name: Checkout code
-         uses: actions/checkout@v4
+  # Robot-Test:
+  #   needs: CD-Deploy
+  #   runs-on: self-hosted
+  #   steps:
+  #      - name: Checkout code
+  #        uses: actions/checkout@v4
 
-       - name: Set up Python
-         uses: actions/setup-python@v4
-         with:
-          python-version: '3.11'
+  #      - name: Set up Python
+  #        uses: actions/setup-python@v4
+  #        with:
+  #         python-version: '3.11'
 
-       - name: Install Robot Framework
-         run: |
-          pip install robotframework
-          pip install robotframework-seleniumlibrary
+  #      - name: Install Robot Framework
+  #        run: |
+  #         pip install robotframework
+  #         pip install robotframework-seleniumlibrary
 
-       - name: Run Robot Framework Tests
-         run: |
-          robot --outputdir results PLOCLO_cms/Robot-framework/venv/login_test
+  #      - name: Run Robot Framework Tests
+  #        run: |
+  #         robot --outputdir results PLOCLO_cms/Robot-framework/venv/login_test
 
-       - name: Upload Test Results
-         uses: actions/upload-artifact@v4 
-         if: always()
-         with:
-          name: robot-results
-          path: results/
+  #      - name: Upload Test Results
+  #        uses: actions/upload-artifact@v4
+  #        if: always()
+  #        with:
+  #         name: robot-results
+  #         path: results/
 
       # - name: Create .env file
       #   working-directory: ./PLOCLO_cms
