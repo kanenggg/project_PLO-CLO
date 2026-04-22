@@ -339,7 +339,7 @@ jobs:
             -v $(pwd):/zap/wrk:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
-            -t http://<YOUR-INGRESS-URL> \
+            -t http://kanenggg.infinix-lab.com/ \
             -r zap-report.html
 
       - name: Upload ZAP report
