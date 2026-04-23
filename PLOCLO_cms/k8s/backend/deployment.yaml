@@ -13,6 +13,8 @@ spec:
       labels:
         app: backend
     spec:
+      imagePullSecrets:           
+        - name: registry-secret
       containers:
         - name: backend
           image: ${{ secrets.REGISTRY_USER }}/backend:latest
