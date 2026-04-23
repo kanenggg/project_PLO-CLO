@@ -66,27 +66,27 @@ jobs:
           docker build -t ${{ secrets.REGISTRY_HOST }}/frontend:latest ./PLOCLO_cms/frontend
           docker push ${{ secrets.REGISTRY_HOST }}/frontend:latest
 
-  trivy-scan:
-   needs: [Build-Frontend, Build-Backend]
-   runs-on: ubuntu-latest
-   steps:
+  # trivy-scan:
+  #  needs: [Build-Frontend, Build-Backend]
+  #  runs-on: ubuntu-latest
+  #  steps:
 
-    - name: Checkout code
-      uses: actions/checkout@v4
+  #   - name: Checkout code
+  #     uses: actions/checkout@v4
 
-    - name: Configure insecure registry
-      run: |
-        echo '{"insecure-registries":["${{ secrets.REGISTRY_HOST }}"]}' \
-          | sudo tee /etc/docker/daemon.json
-        sudo systemctl restart docker
-        sleep 3
+  #   - name: Configure insecure registry
+  #     run: |
+  #       echo '{"insecure-registries":["${{ secrets.REGISTRY_HOST }}"]}' \
+  #         | sudo tee /etc/docker/daemon.json
+  #       sudo systemctl restart docker
+  #       sleep 3
 
-    - name: Login to registry
-      run: |
-        echo "${{ secrets.REGISTRY_PASS }}" | docker login \
-          ${{ secrets.REGISTRY_HOST }} \
-          -u "${{ secrets.REGISTRY_USER }}" \
-          --password-stdin
+  #   - name: Login to registry
+  #     run: |
+  #       echo "${{ secrets.REGISTRY_PASS }}" | docker login \
+  #         ${{ secrets.REGISTRY_HOST }} \
+  #         -u "${{ secrets.REGISTRY_USER }}" \
+  #         --password-stdin
 
     # - name: Trivy scan - Frontend
     #   uses: aquasecurity/trivy-action@master
