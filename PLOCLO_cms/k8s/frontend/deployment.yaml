@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ${{ secrets.REGISTRY_USER }}/frontend:latest
+          image: 104.197.255.217:5000/frontend:latest
           envFrom:
             - secretRef:
                 name: ploclo-secret
