@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: ${{REGISTRY_HOST}}/backend:latest
+          image: image: ${{ secrets.REGISTRY_USER }}/backend:latest
           command: ["sh", "-c", "until nc -z postgres 5432; do echo Waiting...; sleep 2; done && echo Postgres ready! && npx prisma db push && node dist/index.js"]
           envFrom:
             - secretRef:
