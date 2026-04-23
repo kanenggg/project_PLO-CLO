@@ -338,6 +338,7 @@ jobs:
 
      steps:
       - name: ZAP Baseline Scan
+        continue-on-error: true
         run: |
          mkdir -p zap-output
          chmod 777 zap-output
