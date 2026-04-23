@@ -313,19 +313,6 @@ jobs:
      - name: Checkout
        uses: actions/checkout@v4
 
-     - name: Set registry host in k8s yaml
-       run: |
-           sed -i "s|REGISTRY_HOST|${{ secrets.REGISTRY_HOST }}|g" \
-            ./PLOCLO_cms/k8s/backend/deployment.yaml \
-            ./PLOCLO_cms/k8s/frontend/deployment.yaml
-
-     - name: Create imagePullSecret
-       run: |
-          kubectl create secret docker-registry registry-secret \
-            --docker-server=${{ secrets.REGISTRY_HOST }} \
-            --docker-username=${{ secrets.REGISTRY_USER }} \
-            --docker-password=${{ secrets.REGISTRY_PASS }} \
-            -n ploclo --dry-run=client -o yaml | kubectl apply -f -
      - name: Deploy to K8s
        run: |
           kubectl apply -f ./PLOCLO_cms/k8s/namespace.yaml
