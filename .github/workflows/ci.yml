@@ -359,6 +359,8 @@ jobs:
 
       - name: Port-forward
         run: |
+          pkill -f "kubectl port-forward" || true
+          sleep 2
           sudo -E kubectl port-forward svc/frontend 80:3000 -n ploclo --address 0.0.0.0 &
           kubectl port-forward svc/backend 8000:3001 -n ploclo --address 0.0.0.0 &
           sudo -E kubectl port-forward svc/elasticsearch 9200:9200 -n ploclo --address 0.0.0.0 &
