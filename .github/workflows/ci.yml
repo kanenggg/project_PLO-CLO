@@ -317,13 +317,18 @@ jobs:
   #           echo "TMAS scan passed."
 
   CD-Deploy:
-     needs: [Build-Frontend, Build-Backend]
+     needs: [trivy-scan]
      runs-on: self-hosted
 
      steps:
 
      - name: Checkout
        uses: actions/checkout@v4
+
+     - name: Clear images
+       run: |
+        docker system prune -a -f
+        minikube ssh -- docker image prune -a -f
 
      - name: Deploy to K8s
        run: |
@@ -366,7 +371,6 @@ jobs:
 
       - name: Upload ZAP report
         uses: actions/upload-artifact@v4
-        if: always()
         with:
          name: zap-report
          path: zap-output/zap-report.html
@@ -375,7 +379,7 @@ jobs:
         run: |
           curl -X POST "http://104.197.255.217:9200/zap-logs/_doc" \
             -H "Content-Type: application/json" \
-            -d @zap-output/zap-report.json || true
+            -d @zap-output/zap-report.json
   # Robot-Test:
   #   needs: CD-Deploy
   #   runs-on: self-hosted
