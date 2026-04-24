@@ -328,7 +328,6 @@ jobs:
      - name: Clear images
        run: |
         docker system prune -a -f
-        minikube ssh -- docker image prune -a -f
 
      - name: Deploy to K8s
        run: |
