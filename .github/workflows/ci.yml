@@ -340,8 +340,6 @@ jobs:
           kubectl apply -f ./PLOCLO_cms/k8s/backend/
           kubectl apply -f ./PLOCLO_cms/k8s/frontend/
           kubectl apply -f ./PLOCLO_cms/k8s/ingress.yaml
-          kubectl apply -f ./PLOCLO_cms/k8s/elasticsearch
-          kubectl apply -f ./PLOCLO_cms/k8s/kibana
 
      - name: Rollout restart (pull latest image)
        run: |
@@ -364,7 +362,7 @@ jobs:
         run: |
           pkill -f "kubectl port-forward" || true
           sleep 2
-          sudo -E kubectl port-forward service/frontend 80:3000 -n ploclo --address 0.0.0.0
+          sudo -E kubectl port-forward service/frontend 80:3000 -n ploclo --address 0.0.0.0 &
           kubectl port-forward svc/backend 8000:3001 -n ploclo --address 0.0.0.0 &
           sudo -E kubectl port-forward svc/elasticsearch 9200:9200 -n ploclo --address 0.0.0.0 &
           sleep 5
@@ -396,7 +394,7 @@ jobs:
         run: |
           curl -X POST "http://104.197.255.217:9200/zap-logs/_doc" \
             -H "Content-Type: application/json" \
-            -d @zap-output/zap-report.json
+            -d @zap-output/zap-report.json || true
   # Robot-Test:
   #   needs: CD-Deploy
   #   runs-on: self-hosted
