@@ -378,6 +378,9 @@ jobs:
             -r zap-report.html \
             -J zap-report.json || true
 
+          echo "=== Files in zap-output ==="
+          ls -la zap-output/
+
       - name: Upload ZAP report
         uses: actions/upload-artifact@v4
         with:
