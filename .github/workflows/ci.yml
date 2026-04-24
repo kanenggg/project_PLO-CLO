@@ -238,15 +238,43 @@ jobs:
 
     - name: Send Trivy Backend to Elasticsearch
       run: |
-          curl -X POST "http://104.197.255.217:9200/trivy-backend/_doc" \
-            -H "Content-Type: application/json" \
-            -d @trivy-results-backend.json || true
-      
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        cat trivy-results-backend.json | \
+          jq -c --arg ts "$TIMESTAMP" \
+          '.Results[]?.Vulnerabilities[]? | {
+            timestamp: $ts,
+            image: "backend",
+            cve: .VulnerabilityID,
+            severity: .Severity,
+            package: .PkgName,
+            installed_version: .InstalledVersion,
+            fixed_version: .FixedVersion,
+            title: .Title
+          }' | while read -r doc; do
+            curl -s -X POST "http://104.197.255.217:9200/trivy-logs/_doc" \
+              -H "Content-Type: application/json" \
+              -d "$doc" || true
+          done
+
     - name: Send Trivy Frontend to Elasticsearch
       run: |
-          curl -X POST "http://104.197.255.217:9200/trivy-frontend/_doc" \
-            -H "Content-Type: application/json" \
-            -d @trivy-results-frontend.json || true   # ← แก้ชื่อไฟล์
+        TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+        cat trivy-results-frontend.json | \
+          jq -c --arg ts "$TIMESTAMP" \
+          '.Results[]?.Vulnerabilities[]? | {
+            timestamp: $ts,
+            image: "frontend",
+            cve: .VulnerabilityID,
+            severity: .Severity,
+            package: .PkgName,
+            installed_version: .InstalledVersion,
+            fixed_version: .FixedVersion,
+            title: .Title
+          }' | while read -r doc; do
+            curl -s -X POST "http://104.197.255.217:9200/trivy-logs/_doc" \
+              -H "Content-Type: application/json" \
+              -d "$doc" || true
+          done
 
     # - name: Fail if CRITICAL or HIGH found
     #   run: |
