@@ -348,15 +348,14 @@ jobs:
 
      - name: Wait for rollout
        run: |
-          kubectl rollout status deployment/backend -n ploclo --timeout=120s
-          kubectl rollout status deployment/frontend -n ploclo --timeout=120s
+          kubectl rollout status deployment/backend -n ploclo --timeout=180s
+          kubectl rollout status deployment/frontend -n ploclo --timeout=180s
 
   zap-scan:
      needs: CD-Deploy
      runs-on: self-hosted
 
      steps:
-
 
       - name: Port-forward
         run: |
