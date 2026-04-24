@@ -383,11 +383,6 @@ jobs:
          name: zap-report
          path: zap-output/zap-report.html
 
-      - name: zap output
-        run: |
-          cd zap-output
-          python3 -m http.server 8888
-
 
       - name: Send ZAP results to Elasticsearch
         run: |
