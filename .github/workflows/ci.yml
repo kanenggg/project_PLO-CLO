@@ -329,6 +329,10 @@ jobs:
        run: |
         docker system prune -a -f
 
+     - name: Wait for Minikube
+       run: |
+         kubectl wait --for=condition=Ready node/minikube --timeout=60s
+
      - name: Deploy to K8s
        run: |
           kubectl apply -f ./PLOCLO_cms/k8s/namespace.yaml
