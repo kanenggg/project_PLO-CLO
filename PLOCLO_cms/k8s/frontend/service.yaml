@@ -1,27 +1,13 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: v1
+kind: Service
 metadata:
-  name: elasticsearch
+  name: frontend
   namespace: ploclo
 spec:
-  replicas: 1
   selector:
-    matchLabels:
-      app: elasticsearch
-  template:
-    metadata:
-      labels:
-        app: elasticsearch
-    spec:
-      containers:
-        - name: elasticsearch
-          image: elasticsearch:8.12.0
-          env:
-            - name: discovery.type
-              value: single-node
-            - name: xpack.security.enabled
-              value: "false"
-            - name: ES_JAVA_OPTS
-              value: "-Xms512m -Xmx512m"
-          ports:
-            - containerPort: 9200
+      app: frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30000
+  type: LoadBalancer 
